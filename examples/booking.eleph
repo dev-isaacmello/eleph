@@ -1,0 +1,31 @@
+# Reserva completa: pergunta, pedido e promessa.
+#
+# A promessa nao e texto. E um construto da linguagem, e o compilador exige
+# que o log deste caminho ja a estabeleca no instante em que ela e feita.
+
+program airline
+
+event make_reservation(passenger, flight)
+event cancel_reservation(passenger, flight)
+event board(passenger, flight)
+
+fact has_reservation(P, F) := make_reservation(P, F) since_not cancel_reservation(P, F)
+
+on question(Caller, has_reservation(P, F)):
+    answer Caller with has_reservation(P, F)
+
+on request(Caller, make_reservation(P, F)):
+    if has_reservation(P, F):
+        decline Caller
+    else:
+        record make_reservation(P, F)
+        accept Caller
+        promise Caller that has_reservation(P, F)
+
+on request(Caller, cancel_reservation(P, F)):
+    if has_reservation(P, F):
+        record cancel_reservation(P, F)
+        accept Caller
+        promise Caller that not has_reservation(P, F)
+    else:
+        decline Caller

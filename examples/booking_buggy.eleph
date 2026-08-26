@@ -1,0 +1,17 @@
+# O mesmo programa, com a falha mais comum de agente em producao em 2026:
+# ele aceita o pedido e promete o resultado, mas nao faz a coisa.
+
+program airline
+
+event make_reservation(passenger, flight)
+event cancel_reservation(passenger, flight)
+event board(passenger, flight)
+
+fact has_reservation(P, F) := make_reservation(P, F) since_not cancel_reservation(P, F)
+
+on request(Caller, make_reservation(P, F)):
+    if has_reservation(P, F):
+        decline Caller
+    else:
+        accept Caller
+        promise Caller that has_reservation(P, F)
