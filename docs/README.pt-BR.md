@@ -389,7 +389,7 @@ pip install eleph          # or:  uv pip install eleph
 A partir do código-fonte:
 
 ```bash
-git clone https://github.com/isaacmello/eleph && cd eleph
+git clone https://github.com/dev-isaacmello/eleph && cd eleph
 uv venv && uv pip install -e ".[dev]"
 ```
 

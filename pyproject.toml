@@ -28,10 +28,10 @@ classifiers = [
 dependencies = ["z3-solver>=4.12"]
 
 [project.urls]
-Homepage = "https://github.com/isaacmello/eleph"
-Source = "https://github.com/isaacmello/eleph"
-Issues = "https://github.com/isaacmello/eleph/issues"
-Changelog = "https://github.com/isaacmello/eleph/blob/main/CHANGELOG.md"
+Homepage = "https://github.com/dev-isaacmello/eleph"
+Source = "https://github.com/dev-isaacmello/eleph"
+Issues = "https://github.com/dev-isaacmello/eleph/issues"
+Changelog = "https://github.com/dev-isaacmello/eleph/blob/main/CHANGELOG.md"
 
 [project.scripts]
 eleph = "eleph.cli:main"

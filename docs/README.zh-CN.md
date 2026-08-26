@@ -340,7 +340,7 @@ pip install eleph          # or:  uv pip install eleph
 从源码安装：
 
 ```bash
-git clone https://github.com/isaacmello/eleph && cd eleph
+git clone https://github.com/dev-isaacmello/eleph && cd eleph
 uv venv && uv pip install -e ".[dev]"
 ```
 
