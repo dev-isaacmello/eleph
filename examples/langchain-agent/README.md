@@ -13,10 +13,43 @@ a better prompt proves nothing.
 ```bash
 uv pip install -e "../..[langchain]"
 
-python compare.py            # scripted stand in, no key and no spend
-python compare.py --live     # Claude, needs ANTHROPIC_API_KEY with credit
-python compare.py --live -n 5   # five runs per scenario, for a rate
+python compare.py               # scripted stand in, no key and no spend
+python compare.py --live -n 5   # LangChain and an API key, pay as you go
+python compare.py --sdk  -n 5   # Agent SDK over OAuth, draws on your plan
 ```
+
+`-n` matters. Models are stochastic, and a single run per scenario is an
+anecdote. Three consecutive single run comparisons here produced three
+different totals before any code changed.
+
+### Which of the two live modes
+
+A Claude.ai subscription and the Anthropic API Console are **separate billing
+systems**. A Pro or Max plan does not include API access, and any key generated
+in the Console is pay as you go regardless of your plan.
+
+The path that draws on the plan is the **Claude Agent SDK** (or the Claude Code
+CLI), which authenticates over OAuth:
+
+```bash
+npm install -g @anthropic-ai/claude-code
+claude setup-token
+```
+
+`--sdk` uses that. `--live` uses LangChain with an API key. Both run the same
+policy, backend, scenarios and guarded/unguarded flip; the comparison is always
+made within one mode, never across the two.
+
+Two things to know before choosing `--sdk`:
+
+* **`ANTHROPIC_API_KEY` shadows OAuth, silently.** Credentials resolve in
+  order and an API key in the environment wins, so you would be paying pay as
+  you go while believing you were on your plan. `sdk_agent.py` removes it for
+  the duration of the call and restores it afterwards.
+* **A plan is licensed for individual use.** Your own agent on your own
+  subscription is fine. Serving other people's traffic through one token is
+  not, and you would hit the rate limit in seconds anyway. Anything with users
+  wants an API key with Console credit.
 
 ## What is measured
 
