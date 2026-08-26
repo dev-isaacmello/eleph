@@ -1,0 +1,42 @@
+# A politica do suporte de assinaturas, escrita de forma conferivel.
+#
+# Duas regras que qualquer time de suporte tem por escrito em algum lugar, e
+# que nenhum sistema costuma checar:
+#
+#   1. So cancela quem esta ativo.
+#   2. So reembolsa cobranca que existe, ainda nao foi reembolsada, e cujo
+#      cliente ja cancelou.
+#
+# `eleph check` prova as duas para todo historico antes de qualquer agente
+# encostar nelas.
+
+program suporte
+
+sort User
+sort Charge
+
+event subscribed(u: User)
+event cancelled(u: User)
+event charged(u: User, c: Charge)
+event refunded(u: User, c: Charge)
+event settled(u: User, c: Charge)
+event statement_closed(u: User)
+
+# Ativo quem assinou e nao cancelou desde entao. Nao existe campo `status`
+# em lugar nenhum: a resposta e uma consulta ao que aconteceu.
+fact active(U: User) := subscribed(U) since_not cancelled(U)
+
+# Cobranca em aberto: ocorreu e nao foi reembolsada desde entao.
+fact outstanding(U: User, C: Charge) := charged(U, C) since_not refunded(U, C)
+
+# Reembolsavel: em aberto, e o cliente ja nao esta mais ativo.
+fact refundable(U: User, C: Charge) := outstanding(U, C) and not active(U)
+
+# O dinheiro voltou de fato, o que e diferente de ter sido autorizado.
+fact settled_back(U: User, C: Charge) := settled(U, C) since_not charged(U, C)
+
+on question(A, active(U)):
+    answer A with active(U)
+
+on question(A, refundable(U, C)):
+    answer A with refundable(U, C)
