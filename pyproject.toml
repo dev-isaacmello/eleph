@@ -39,6 +39,11 @@ eleph = "eleph.cli:main"
 [project.optional-dependencies]
 dev = ["pytest>=8"]
 claude = ["anthropic>=0.40"]   # only for the natural language front end
+langchain = [                  # only for examples/langchain-agent
+    "langchain>=1.0",
+    "langchain-anthropic>=1.0",
+    "langgraph>=1.0",
+]
 
 [build-system]
 requires = ["hatchling"]

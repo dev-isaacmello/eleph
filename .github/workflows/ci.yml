@@ -21,7 +21,7 @@ jobs:
           enable-cache: true
 
       - name: install
-        run: uv pip install --system -e ".[dev]"
+        run: uv pip install --system -e ".[dev,langchain]"
 
       - name: tests
         run: pytest -q
