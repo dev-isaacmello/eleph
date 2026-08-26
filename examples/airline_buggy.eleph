@@ -1,0 +1,19 @@
+# A companhia aerea do McCarthy, escrita do jeito errado.
+#
+# O bug tem uma palavra. O guarda pergunta "ele fez uma reserva?" quando
+# deveria perguntar "ele tem uma reserva?". Sao coisas diferentes e a
+# diferenca e o cancelamento.
+
+program airline
+
+event make_reservation(passenger, flight)
+event cancel_reservation(passenger, flight)
+event board(passenger, flight)
+
+fact has_reservation(P, F) := make_reservation(P, F) since_not cancel_reservation(P, F)
+
+on question(Caller, has_reservation(P, F)):
+    if make_reservation(P, F):
+        answer Caller yes
+    else:
+        answer Caller no
