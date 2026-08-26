@@ -1,0 +1,8 @@
+# Nao existe variavel "tem_reserva" em lugar nenhum. A resposta muda porque
+# o passado mudou.
+question alice has_reservation(alice, ba117)
+request  alice make_reservation(alice, ba117)
+question alice has_reservation(alice, ba117)
+request  alice make_reservation(alice, ba117)
+request  alice cancel_reservation(alice, ba117)
+question alice has_reservation(alice, ba117)

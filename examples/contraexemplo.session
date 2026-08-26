@@ -1,0 +1,5 @@
+# Este e literalmente o historico que o verificador imprimiu para
+# examples/airline_buggy.eleph. Replicado contra o programa com bug.
+given    make_reservation(alice, ba117)
+given    cancel_reservation(alice, ba117)
+question alice has_reservation(alice, ba117)

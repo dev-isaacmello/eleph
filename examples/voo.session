@@ -1,0 +1,13 @@
+# Capacidade 2. Tres passageiros querem entrar.
+request alice make_reservation(alice, ba117)
+request bruno make_reservation(bruno, ba117)
+request carla make_reservation(carla, ba117)
+
+# Alice recebe assento; a promessa dela e paga.
+request alice assign_seat(alice, ba117)
+
+# Bruno embarca sem assento. O prazo vence.
+given board(bruno, ba117)
+
+question alice has_seat(alice, ba117)
+question carla has_reservation(carla, ba117)

@@ -1,0 +1,7 @@
+# Linguagem natural. O extrator so propoe; a linguagem decide.
+alice: quero make_reservation para alice no ba117
+alice: a alice tem has_reservation no ba117?
+alice: quantos seats_left no ba117?
+alice: me da um assign_seat para alice no ba117
+alice: a alice tem has_seat no ba117?
+alice: e a cotacao do dolar hoje?
