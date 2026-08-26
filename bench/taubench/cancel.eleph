@@ -1,0 +1,54 @@
+# A regra de elegibilidade de cancelamento do tau-bench.
+#
+# Do wiki do dominio airline, textualmente:
+#
+#   "All reservations can be cancelled within 24 hours of booking, or if the
+#    airline cancelled the flight. Otherwise, basic economy or economy flights
+#    can be cancelled only if travel insurance is bought and the condition is
+#    met, and business flights can always be cancelled. The rules are strict
+#    regardless of the membership status. The API does not check these for the
+#    agent, so the agent must make sure the rules apply before calling the API!"
+#
+# A ultima frase e do wiki, com exclamacao e tudo. E verdade: cancel_reservation
+# nao faz uma unica checagem. Escreve no banco e pronto.
+#
+# Note como o tempo entra. A linguagem nao tem relogio: `since_not` so conhece
+# ordem. As "24 horas" chegam como um evento que o sistema hospedeiro emite
+# depois de olhar o relogio dele. A logica so ve eventos -- que e como sistema
+# event-sourced trata tempo de qualquer jeito, e o que mantem tudo decidivel.
+
+program taubench_cancel
+
+sort Reservation
+
+event booked_within_24h(r: Reservation)
+event airline_cancelled_flight(r: Reservation)
+event has_insurance(r: Reservation)
+event reason_is_covered(r: Reservation)
+
+# A cabine muda. Um agente pode subir para business e cancelar em seguida,
+# porque "business flights can always be cancelled" -- e isso e legitimo. Mas
+# ela tambem desce. Atributo mutavel nao se modela com "aconteceu alguma vez";
+# modela-se com a ultima mudanca, que e para isso que since_not serve.
+event cabin_set_business(r: Reservation)
+event cabin_set_other(r: Reservation)
+
+fact is_business(R: Reservation) := cabin_set_business(R) since_not cabin_set_other(R)
+
+# "the condition is met" -- o wiki nunca diz qual condicao. A secao de reserva
+# so diz que o seguro "enables full refund if the user needs to cancel the
+# flight given health or weather reasons". Duas leituras cabem na frase.
+
+# Estrita: seguro E motivo coberto. E o que o tau3-bench veio a escrever
+# explicitamente: "The user has travel insurance and the reason for
+# cancellation is covered by insurance".
+fact cancellable_strict(R: Reservation) := booked_within_24h(R) or airline_cancelled_flight(R) or is_business(R) or (has_insurance(R) and reason_is_covered(R))
+
+# Frouxa: ter seguro basta.
+fact cancellable_loose(R: Reservation) := booked_within_24h(R) or airline_cancelled_flight(R) or is_business(R) or has_insurance(R)
+
+on question(C, cancellable_strict(R)):
+    answer C with cancellable_strict(R)
+
+on question(C, cancellable_loose(R)):
+    answer C with cancellable_loose(R)
