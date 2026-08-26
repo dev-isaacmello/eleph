@@ -183,6 +183,10 @@ históricos com mais de mil eventos.
 
 ## Use a partir do Python
 
+Um exemplo completo esta em [`examples/langchain-agent`](../examples/langchain-agent):
+o mesmo agente LangChain rodado duas vezes sobre cinco casos, uma com guarda
+embaixo e outra sem, com modelo, prompt e ferramentas identicos.
+
 A linguagem é o artefato de pesquisa. O que a maioria dos sistemas precisa é
 menor, e isso vem como biblioteca:
 

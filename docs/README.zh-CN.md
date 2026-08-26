@@ -163,6 +163,10 @@ interacoes      log   relendo   indice   ganho     ev/s  escala
 
 ## 在 Python 中使用
 
+完整示例位于 [`examples/langchain-agent`](../examples/langchain-agent)：同一个
+LangChain 智能体在五个场景上运行两次，一次底层有 guard，一次没有，模型、提示词
+和工具完全相同。
+
 这门语言是研究成果本身。大多数系统需要的东西更小，而它以库的形式提供：
 
 ```python

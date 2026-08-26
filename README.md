@@ -177,6 +177,10 @@ a thousand events.
 
 ## Use it from Python
 
+A worked example lives in [`examples/langchain-agent`](examples/langchain-agent):
+the same LangChain agent run twice over five cases, once with a guard
+underneath and once without, with identical model, prompt and tools.
+
 The language is the research artifact. What most systems need is smaller, and
 it ships as a library:
 

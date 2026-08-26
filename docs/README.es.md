@@ -184,6 +184,10 @@ aleatorios e historiales de más de mil eventos.
 
 ## Úsalo desde Python
 
+Un ejemplo completo esta en [`examples/langchain-agent`](../examples/langchain-agent):
+el mismo agente LangChain ejecutado dos veces sobre cinco casos, una con un
+guard debajo y otra sin el, con modelo, prompt y herramientas identicos.
+
 El lenguaje es el artefacto de investigación. Lo que la mayoría de los sistemas
 necesita es más pequeño, y se distribuye como biblioteca:
 
