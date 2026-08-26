@@ -1,0 +1,13 @@
+# Um bug que so aparece fundo no historico: o programa acha que oito reservas
+# ja foram feitas quando so viu sete.
+program milhagem
+sort Passenger
+sort Flight
+event make_reservation(p: Passenger, f: Flight)
+fact elite(P: Passenger, F: Flight) := count make_reservation(P, F) >= 8
+
+on question(C, elite(P, F)):
+    if count make_reservation(P, F) >= 7:
+        answer C yes
+    else:
+        answer C no
