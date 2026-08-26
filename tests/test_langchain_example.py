@@ -34,12 +34,12 @@ def test_the_policy_is_proved_before_any_agent_touches_it(pieces):
 
 
 def test_the_guard_changes_the_outcome(pieces):
-    """Two of five without it, five of five with it, on the scripted model."""
+    """On the scripted model, which always does what the customer asked."""
     policy, scenarios, once = pieces
     plain = sum(once(s, False, policy, None)["ok"] for s in scenarios)
     guarded = sum(once(s, True, policy, None)["ok"] for s in scenarios)
     assert plain == 2
-    assert guarded == 5
+    assert guarded == len(scenarios) == 7
 
 
 def test_the_guard_never_makes_a_correct_run_incorrect(pieces):
@@ -54,7 +54,7 @@ def test_the_guard_never_makes_a_correct_run_incorrect(pieces):
 def test_refusals_are_what_produce_the_difference(pieces):
     policy, scenarios, once = pieces
     refused = sum(once(s, True, policy, None)["refusals"] for s in scenarios)
-    assert refused == 3
+    assert refused == 5
 
 
 def test_a_refund_becomes_a_tracked_debt(pieces):
