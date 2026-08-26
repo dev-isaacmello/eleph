@@ -1,0 +1,34 @@
+# A regra de confirmacao do tau-bench, nas duas leituras que a frase admite.
+#
+# Do wiki do dominio airline, textualmente:
+#
+#   "Before taking any actions that update the booking database (booking,
+#    modifying flights, editing baggage, upgrading cabin class, or updating
+#    passenger information), you must list the action details and obtain
+#    explicit user confirmation (yes) to proceed."
+#
+# A frase nao decide se uma confirmacao vale por acao ou por turno. Quando o
+# usuario diz "sim, faca o upgrade e cancele depois", ele confirmou uma coisa
+# ou duas? O wiki nao diz, a API nao checa -- o proprio wiki avisa isso duas
+# vezes -- e a recompensa compara o banco final, entao tambem nao checa.
+#
+# Aqui as duas leituras sao escritas e as duas sao medidas.
+
+program taubench_airline
+
+event confirmed()      # o usuario disse sim
+event requested()      # o usuario falou outra coisa: um pedido novo
+event executed()       # o agente chamou uma ferramenta que escreve no banco
+
+# Leitura estrita: uma confirmacao vale por uma acao, e a acao a consome.
+fact confirmed_per_action() := confirmed() since_not executed()
+
+# Leitura generosa: uma confirmacao cobre o lote que o usuario autorizou, e so
+# perde a validade quando ele volta a falar pedindo outra coisa.
+fact confirmed_per_turn() := confirmed() since_not requested()
+
+on question(C, confirmed_per_action()):
+    answer C with confirmed_per_action()
+
+on question(C, confirmed_per_turn()):
+    answer C with confirmed_per_turn()
