@@ -1,0 +1,33 @@
+# environments
+.venv/
+venv/
+env/
+
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+
+# tooling
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# event logs written by examples and by anything you run
+*.jsonl
+examples/.agente-demo.jsonl
+
+# third party benchmark data, fetched on demand by bench/taubench/*.py
+# (MIT, Sierra Research; see the URLs in those scripts)
+bench/taubench/gpt-4o-airline.json
+bench/taubench/flights.json
+
+# editors, os
+.idea/
+.vscode/
+.DS_Store
