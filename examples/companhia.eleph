@@ -1,0 +1,64 @@
+# A companhia aerea completa.
+#
+# Nenhuma variavel, nenhum banco, nenhuma tabela de reservas. Tudo que o
+# programa sabe e o que ele viu acontecer, e tudo que ele diz e cobravel.
+
+program companhia
+
+sort Passenger
+sort Flight
+
+event make_reservation(p: Passenger, f: Flight)
+event cancel_reservation(p: Passenger, f: Flight)
+event assign_seat(p: Passenger, f: Flight)
+event board(p: Passenger, f: Flight)
+event close_flight(f: Flight)
+
+# Tem reserva quem fez uma e nao cancelou desde entao.
+fact has_reservation(P: Passenger, F: Flight) := make_reservation(P, F) since_not cancel_reservation(P, F)
+
+# Tem assento quem recebeu um e nao cancelou a reserva desde entao.
+fact has_seat(P: Passenger, F: Flight) := assign_seat(P, F) since_not cancel_reservation(P, F)
+
+# Capacidade: quantos passageiros tem reserva neste voo agora. Isto nao era
+# expressavel sem quantificacao, e e o exemplo do proprio McCarthy.
+fact seats_left(F: Flight) := count P: Passenger where has_reservation(P, F) < 2
+
+fact flight_open(F: Flight) := not close_flight(F)
+
+on question(C, has_reservation(P, F)):
+    answer C with has_reservation(P, F)
+
+on question(C, has_seat(P, F)):
+    answer C with has_seat(P, F)
+
+on question(C, seats_left(F)):
+    answer C with seats_left(F)
+
+on request(C, make_reservation(P, F)):
+    if has_reservation(P, F):
+        decline C
+    else:
+        if seats_left(F) and flight_open(F):
+            record make_reservation(P, F)
+            accept C
+            promise C that has_reservation(P, F)
+            promise C that has_seat(P, F) before board(P, F)
+        else:
+            decline C
+
+on request(C, assign_seat(P, F)):
+    if has_reservation(P, F):
+        record assign_seat(P, F)
+        accept C
+    else:
+        decline C
+
+on request(C, cancel_reservation(P, F)):
+    if has_reservation(P, F):
+        record cancel_reservation(P, F)
+        accept C
+        promise C that not has_reservation(P, F)
+        release C from has_seat(P, F)
+    else:
+        decline C
