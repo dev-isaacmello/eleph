@@ -1,0 +1,56 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: install
+        run: uv pip install --system -e ".[dev]"
+
+      - name: tests
+        run: pytest -q
+
+      - name: every example verifies as expected
+        run: |
+          set -e
+          for f in examples/airline.eleph examples/booking.eleph examples/companhia.eleph; do
+            eleph check "$f" --no-color | tail -2 | grep -q PROVADO
+          done
+          for f in examples/airline_buggy.eleph examples/booking_buggy.eleph examples/fundo.eleph; do
+            eleph check "$f" --no-color | tail -2 | grep -q REPROVADO
+          done
+
+      - name: the three integration shapes run
+        run: python examples/agente.py > /dev/null
+
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v5
+      - name: build sdist and wheel
+        run: uv build
+      - name: the wheel installs and the cli works
+        run: |
+          uv pip install --system dist/*.whl
+          eleph check examples/airline_buggy.eleph --no-color | tail -2 | grep -q REPROVADO
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
