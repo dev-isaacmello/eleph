@@ -20,36 +20,49 @@ jobs:
         with:
           enable-cache: true
 
+      # A virtual environment, not --system: the runner's system Python is
+      # externally managed, and --system would also quietly ignore the matrix
+      # and test whatever version the image happens to ship.
       - name: install
-        run: uv pip install --system -e ".[dev,langchain]"
+        run: |
+          uv venv --python ${{ matrix.python }}
+          uv pip install -e ".[dev,langchain]"
+
+      - name: the python under test is the one the matrix asked for
+        run: uv run python -c "import sys; assert sys.version.startswith('${{ matrix.python }}'), sys.version; print(sys.version)"
 
       - name: tests
-        run: pytest -q
+        run: uv run pytest -q
 
       - name: every example verifies as expected
         run: |
           set -e
-          for f in examples/airline.eleph examples/booking.eleph examples/companhia.eleph; do
-            eleph check "$f" --no-color | tail -2 | grep -q PROVADO
+          for f in examples/airline.eleph examples/booking.eleph examples/companhia.eleph examples/langchain-agent/policy.eleph; do
+            uv run eleph check "$f" --no-color | tail -2 | grep -q PROVADO
           done
           for f in examples/airline_buggy.eleph examples/booking_buggy.eleph examples/fundo.eleph; do
-            eleph check "$f" --no-color | tail -2 | grep -q REPROVADO
+            uv run eleph check "$f" --no-color | tail -2 | grep -q REPROVADO
           done
 
       - name: the three integration shapes run
-        run: python examples/agente.py > /dev/null
+        run: uv run python examples/agente.py > /dev/null
 
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: astral-sh/setup-uv@v5
+
       - name: build sdist and wheel
         run: uv build
+
       - name: the wheel installs and the cli works
         run: |
-          uv pip install --system dist/*.whl
-          eleph check examples/airline_buggy.eleph --no-color | tail -2 | grep -q REPROVADO
+          uv venv
+          uv pip install dist/*.whl
+          uv run eleph check examples/airline_buggy.eleph --no-color | tail -2 | grep -q REPROVADO
+          uv run eleph check examples/companhia.eleph --no-color | tail -2 | grep -q PROVADO
+
       - uses: actions/upload-artifact@v4
         with:
           name: dist
