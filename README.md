@@ -314,15 +314,30 @@ on request(C, make_reservation(P, F)):  ...
 | `exists P: Sort where φ` | some object satisfies φ now |
 | `count P: Sort where φ >= n` | how many do, which is what a seat limit needs |
 | `spoke accept to C about e(...)` | the program performed that act in that exchange |
+| `e(a, amount > 100)` | a numeric field of the event, tested as it happens |
 | `not`, `and`, `or` | as usual |
+
+A handler may be gated on authority, which is McCarthy's eighth speech act and
+the one an ordinary review never asks about:
+
+```
+on question(Quem, saldo(C)) permitted pode_perguntar(Quem, C):
+    answer Quem with saldo(C)
+```
+
+A support agent that truthfully reports any customer's balance to whoever asks
+has told no lie at all, and every other obligation here would pass it. The
+permission joins the path condition, so answers are proved *under* it rather
+than checked off to one side, and the runtime fails closed: an answer withheld
+is recoverable, an answer leaked is not.
 
 Bare `e(a, b)` meaning *ever happened* is the trap, on purpose: it reads like
 "has" and means "made". The verifier is what tells the two apart.
 
 Statements: `answer C yes` / `answer C no` / `answer C with φ`, `record e(...)`,
-`accept C`, `decline C`, `release C from φ`, and three strengths of commitment,
-`promise C that φ` (true when said), `promise C eventually φ`, and
-`promise C that φ before e(...)`.
+`accept C`, `decline C`, `release C from φ`, and four strengths of commitment:
+`offer C that φ` (willing, not yet owing), `promise C that φ` (true when said),
+`promise C eventually φ`, and `promise C that φ before e(...)`.
 
 ## Obligations derived
 
@@ -332,7 +347,9 @@ Statements: `answer C yes` / `answer C no` / `answer C with φ`, `record e(...)`
 | answer responds to the question asked | Z3 |
 | immediate promise holds when made | Z3, over the log plus what the handler just recorded |
 | future promise is one some path can bring about | Z3, requiring the path to turn it from false to true |
-| argument sorts agree with declarations | compiler |
+| argument sorts agree with declarations | compiler, on every fact, used or not |
+| an offer is one some path could honour | Z3 |
+| no door onto a protected subject is left unlocked | structural |
 | every path answers exactly once | structural |
 | every request is accepted or declined exactly once | structural |
 | outstanding and breached commitments | runtime ledger |
@@ -344,9 +361,10 @@ Statements: `answer C yes` / `answer C no` / `answer C with φ`, `record e(...)`
   today, and the one `bench/taubench/cancel.eleph` uses, is for the host to
   emit the deadline as an event. The clock lives outside the logic, which is
   how event sourced systems handle time anyway.
-* **Events carry identities, not data.** No `price > 100`. Put the
-  classification in the event identity instead, which is coarse but works for
-  policy level rules.
+* **Numeric fields are compared at the instant the event happens.** That is
+  what keeps the completeness argument intact, and it is also the limit: you
+  can ask whether *this charge* was over 100, not whether the sum of the last
+  three was. Aggregate arithmetic over the history is not expressible.
 * **The linear completeness threshold covers a fragment.** It holds when every
   `since_not` takes atoms. Outside it, completeness comes from the monitor's
   state space, and past that the checker admits the run was not exhaustive. The
