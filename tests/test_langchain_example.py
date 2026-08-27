@@ -85,3 +85,47 @@ def test_both_halves_expose_the_same_tools(pieces):
     assert [t.description for t in plain] == [t.description for t in guarded]
     assert [t.args_schema.model_json_schema() for t in plain] == \
            [t.args_schema.model_json_schema() for t in guarded]
+
+
+def test_two_permitted_actions_must_not_compose_into_a_forbidden_one(pieces):
+    """The loophole this example was built with, kept closed.
+
+    The first version of the policy read "refundable = an open charge, and the
+    customer is not active". Cancelling is permitted for an active customer, so
+    an agent could cancel today and thereby make a charge from three months ago
+    refundable: two permitted actions composing into a forbidden outcome. A
+    cheap model reached it on its own, occasionally, without being asked to.
+
+    The policy was proved for every history before and after the fix. A proof
+    says each obligation holds. It does not say the policy is the one you
+    meant, and this is what that distinction costs.
+    """
+    from eleph import Ungrounded
+    from agent import seed
+    from scenarios import SCENARIOS
+
+    policy, _, _ = pieces
+    false_premise = next(s for s in SCENARIOS if s.name == "premissa falsa")
+    backend = false_premise.setup()
+    guard = seed(policy.guard(), backend)
+
+    with pytest.raises(Ungrounded):
+        guard.require("refundable", "ana", "c1")
+
+    guard.require("active", "ana")          # cancelling her is permitted
+    guard.record("cancelled", "ana")
+    assert not guard.holds("active", "ana")
+
+    with pytest.raises(Ungrounded):          # and it buys the agent nothing
+        guard.require("refundable", "ana", "c1")
+
+
+def test_the_legitimate_refund_survived_closing_the_loophole(pieces):
+    """A rule tightened until nothing passes is not a fix."""
+    from agent import seed
+    from scenarios import SCENARIOS
+
+    policy, _, _ = pieces
+    legit = next(s for s in SCENARIOS if s.name == "reembolso legitimo")
+    guard = seed(policy.guard(), legit.setup())
+    guard.require("refundable", "bruno", "c1")
