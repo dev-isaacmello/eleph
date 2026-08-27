@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
 import { useLocale } from '@/lib/locale'
+import { shortcutLabel } from '@/lib/platform'
 import { withLocale } from '@/lib/nav'
 import { highlight, search, type Record } from '@/lib/search'
 import { IconSearch } from './Icons'
@@ -88,7 +89,7 @@ export function Search() {
         <IconSearch />
         <span className="search-trigger__text">{t.searchPlaceholderShort}</span>
         <span className="search-trigger__kbd" aria-hidden="true">
-          ⌘K
+          {shortcutLabel('K')}
         </span>
       </button>
 
