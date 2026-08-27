@@ -7,6 +7,7 @@
 </p>
 
 <p align="center">
+  <a href="https://elephlanguage.vercel.app/zh-CN"><strong>文档</strong></a> ·
   <a href="#安装">安装</a> ·
   <a href="#在-python-中使用">Python API</a> ·
   <a href="#对照已发表的-benchmark-进行度量">Benchmark</a> ·

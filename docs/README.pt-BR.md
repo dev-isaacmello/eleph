@@ -7,6 +7,7 @@
 </p>
 
 <p align="center">
+  <a href="https://elephlanguage.vercel.app/pt-BR"><strong>Documentação</strong></a> ·
   <a href="#instalação">Instalação</a> ·
   <a href="#use-a-partir-do-python">API Python</a> ·
   <a href="#medido-contra-um-benchmark-publicado">Benchmark</a> ·

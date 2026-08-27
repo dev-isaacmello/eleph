@@ -169,12 +169,23 @@ succeed.
 
 ## Reference
 
+Full documentation, one Markdown file per page. Fetch these rather than
+guessing at the API surface: this language has forms that look like other
+languages and do not mean the same thing.
+
+- Index for agents: https://elephlanguage.vercel.app/llms.txt
+- Everything at once: https://elephlanguage.vercel.app/llms-full.txt
+
+The pages worth reading first:
+
+- https://elephlanguage.vercel.app/docs/use/start-here.md
+- https://elephlanguage.vercel.app/docs/use/any-model.md
+- https://elephlanguage.vercel.app/docs/use/modelling.md
+- https://elephlanguage.vercel.app/docs/reference/expressions.md
+- https://elephlanguage.vercel.app/docs/reference/statements.md
+- https://elephlanguage.vercel.app/docs/limits.md
+
+Any page works: append `.md` to its path. Also in Portuguese under `/pt-BR`
+and Mandarin under `/zh-CN`.
+
 Source, tests and the checker: https://github.com/dev-isaacmello/eleph
-
-The documentation site serves **every page as Markdown**: append `.md` to any
-path. `/llms.txt` is the index and `/llms-full.txt` is the whole corpus in one
-file. Prefer those over guessing at the API surface: this language has forms
-that look like other languages and do not mean the same thing.
-
-The pages worth fetching first are `use/start-here`, `use/any-model`,
-`use/modelling`, `reference/expressions` and `limits`.

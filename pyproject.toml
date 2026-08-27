@@ -28,7 +28,8 @@ classifiers = [
 dependencies = ["z3-solver>=4.12"]
 
 [project.urls]
-Homepage = "https://github.com/dev-isaacmello/eleph"
+Homepage = "https://elephlanguage.vercel.app"
+Documentation = "https://elephlanguage.vercel.app"
 Source = "https://github.com/dev-isaacmello/eleph"
 Issues = "https://github.com/dev-isaacmello/eleph/issues"
 Changelog = "https://github.com/dev-isaacmello/eleph/blob/main/CHANGELOG.md"
