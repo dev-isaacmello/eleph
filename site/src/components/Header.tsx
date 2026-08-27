@@ -4,25 +4,9 @@ import { useLocale } from '@/lib/locale'
 import { site } from '@/lib/site'
 import { IconGitHub, IconMenu, IconClose } from './Icons'
 import { LanguageMenu } from './LanguageMenu'
+import { Mark } from './Mark'
 import { Search } from './Search'
 import { ThemeToggle } from './ThemeToggle'
-
-function Mark() {
-  return (
-    <svg className="header__mark" viewBox="0 0 32 32" aria-hidden="true">
-      <rect width="32" height="32" rx="7" fill="var(--fg)" />
-      <path
-        d="M11 8v9a5 5 0 0 0 5 5h1a4 4 0 0 1 4 4v2"
-        fill="none"
-        stroke="var(--bg)"
-        strokeWidth="2.6"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <circle cx="21" cy="10" r="2.4" fill="var(--bg)" />
-    </svg>
-  )
-}
 
 export function Header({
   menuOpen,
@@ -47,7 +31,7 @@ export function Header({
       </button>
 
       <Link to={href('/')} className="header__brand">
-        <Mark />
+        <Mark className="header__mark" />
         <span>{site.name}</span>
       </Link>
 

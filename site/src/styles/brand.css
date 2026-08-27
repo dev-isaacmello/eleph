@@ -1,0 +1,24 @@
+/* ---------------------------------------------------------------------------
+   The mark and the wordmark.
+   Kept apart from layout.css because these are brand decisions, not layout
+   ones: what colour the mark is and what the wordmark is set in are answered
+   by public/brand/README.md, not by the header's geometry.
+   --------------------------------------------------------------------------- */
+
+/* The mark is always the accent, in both themes. The token already flips. */
+.header__brand .header__mark {
+  color: var(--accent);
+  width: 26px;
+  height: 26px;
+  flex: none;
+}
+
+/* The wordmark is Newsreader, as the lockup sets it. The optical size of a
+   serif at 17px wants slightly more weight than the display cut does. */
+.header__brand > span {
+  font-family: var(--font-serif);
+  font-size: 1.15rem;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  line-height: 1;
+}
