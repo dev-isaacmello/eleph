@@ -1,0 +1,149 @@
+---
+title: Start here
+description: You have an agent in production. It calls tools and it tells customers things. This is what eleph does about that, and what it does not.
+---
+
+# Start here
+
+<p className="lede">
+You have an agent in production. It calls tools, it asserts things about a
+customer's record, and it promises to do things. Some of what it says is not
+true, and some of what it promises never happens. This page is about that, and
+you do not need to adopt a new language to get most of the way.
+</p>
+
+## What eleph does
+
+Three things, and they are narrow on purpose:
+
+<Steps>
+<li>
+**It refuses an assertion the record does not support.** Not softens it, not
+logs it. `assert_answer` raises before the text reaches the customer.
+</li>
+<li>
+**It refuses a tool call whose precondition does not hold.** `require` is
+checked against what actually happened, not against a field somebody might have
+forgotten to update.
+</li>
+<li>
+**It remembers what you promised.** "Your refund is on the way" becomes a debt
+with a deadline, and at the end of the run there is an answer to *did we
+deliver*.
+</li>
+</Steps>
+
+## What eleph does not do
+
+<Callout type="danger" title="It will not reduce your token bill">
+Nothing in this project measures cost, so nothing here claims to change it. A
+guard does not rewrite your prompt, does not add a model call, and does not
+retry anything.
+
+What can be verified is the other direction: a `Guard` makes **no model calls
+and no network calls at all**. It is Python reading an append-only list. So it
+does not add spend either.
+
+If your problem is the bill, this is the wrong tool. If your problem is that
+you cannot tell which of the agent's answers were true, keep reading.
+</Callout>
+
+It is also not a prompt technique, not an output filter, and not a policy
+engine you configure through a dashboard. Output filters read the text. This
+reads the history.
+
+## What the measurement actually showed
+
+The same agent, run twice over nine support cases. Identical model, identical
+system prompt, identical tool names, descriptions and signatures. The only
+difference is whether a guard sits under the two tools that write.
+
+| | without eleph | with eleph |
+|---|---|---|
+| Claude Haiku 4.5, 5 runs per case | **30/45** | **45/45** |
+| Claude Opus 5, earlier 7-case suite, 3 runs | **19/21** | **21/21** |
+
+The stronger model fails less. The direction is the same.
+
+Three things in that result matter more than the total, and they are what tells
+you whether your system has this problem:
+
+**The failures are concentrated, not spread.** Six of the nine cases pass 5/5
+on both sides. Three fail 5/5 without the guard. This is not a model being
+occasionally unlucky. It is a model being consistently and reasonably wrong
+about three specific things.
+
+**One case fails 0/5: someone asked about a stranger's account.** The agent
+looked it up and reported back, every single time. Nothing in the prompt told
+it not to, the request was perfectly clear, and answering was the helpful
+thing to do.
+
+**One case passes 5/5 without the guard**, and that matters as much. The prompt
+said the refund limit is R$ 200 and that larger cases escalate; the case was
+clear-cut; the model got it right every time. **A clear instruction about an
+unambiguous case works. The guard is not for those.**
+
+What separates the three failures from the six successes is not difficulty. In
+the three, the model would have had to distrust something: the customer's
+account of the past, the customer's persistence, or the customer's right to be
+asking at all. Models are built not to do that.
+
+[The full comparison, including the bug it was built with →](/docs/integration/langchain)
+
+## Three shapes, cheapest first
+
+You do not have to adopt the language. Two of these three need none of it.
+
+| Shape | You change | You get | Cost to try |
+|---|---|---|---|
+| **observer** | nothing. You feed it events | what is true of the record, and an audit | an afternoon |
+| **guard** | assertions and tool calls route through it | ungrounded claims raise instead of shipping | a day |
+| **language** | handlers written in `.eleph` | the static proof | a week |
+
+Start as an observer over traffic you already have. It cannot break anything,
+because it enforces nothing. If it never disagrees with your system, you do not
+have this problem and you can stop.
+
+## Which one you want
+
+<Callout type="note" title="If you are not sure, you want the guard">
+The **observer** answers "does my agent say things the record does not
+support?" Run it over yesterday's traffic before changing any code.
+
+The **guard** is the one most systems ship. Rules live in a `.eleph` file that
+`eleph check` proves; your Python calls `require`, `assert_answer`, `record`
+and `promise`. You never write a handler.
+
+The **language** is for when the decision logic itself should be verified, not
+just the facts it reads. That is the research artifact, and it is the only one
+that needs the [language reference](/docs/reference/program-structure).
+</Callout>
+
+The reason to keep the rules in a policy file rather than writing the checks in
+Python is one line: **the rules your guard enforces at three in the morning are
+the same artifact a solver proved.** A guard whose rules were proved is a
+different thing from a guard whose rules someone believed.
+
+## The path from here
+
+<Steps>
+<li>
+[**Install it**](/docs/installation) into your project. One dependency, Z3.
+</li>
+<li>
+[**Wire it to your model**](/docs/use/any-model) — GPT-4, Claude, anything.
+Nothing in the guard knows what an LLM is.
+</li>
+<li>
+[**Model your domain**](/docs/use/modelling) — turning the tables you already
+have into events and facts, which is the only genuinely new thinking here.
+</li>
+<li>
+[**The API reference**](/docs/python-api), for when you know what you are
+reaching for.
+</li>
+</Steps>
+
+If you would rather see the idea before the integration, the
+[quickstart](/docs/quickstart) is nine lines and a bug McCarthy wrote down in
+1998.

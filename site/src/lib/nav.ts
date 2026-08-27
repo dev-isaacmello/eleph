@@ -45,6 +45,14 @@ export interface NavGroup {
 export const nav: Record<Locale, NavGroup[]> = {
   en: [
     {
+      title: 'Use it in your agent',
+      items: [
+        { title: 'Start here', href: '/docs/use/start-here' },
+        { title: 'Any model, any framework', href: '/docs/use/any-model' },
+        { title: 'Modelling your domain', href: '/docs/use/modelling' },
+      ],
+    },
+    {
       title: 'Introduction',
       items: [
         { title: 'What eleph is', href: '/docs' },

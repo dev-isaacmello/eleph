@@ -49,8 +49,11 @@ export function Home() {
           conditions. The compiler reads them off the program, then tries to break them.
         </p>
         <div className="hero__actions">
-          <Link className="button button--primary" to="/docs/quickstart">
-            Get started <IconArrowRight />
+          <Link className="button button--primary" to="/docs/use/start-here">
+            Use it in your agent <IconArrowRight />
+          </Link>
+          <Link className="button button--ghost" to="/docs/quickstart">
+            See the language
           </Link>
           <InstallPill />
           <a className="button button--ghost" href={site.repo} target="_blank" rel="noreferrer">
@@ -200,7 +203,10 @@ export function Home() {
           </div>
           <div className="stat">
             <div className="stat__value">45/45</div>
-            <div className="stat__label">guarded agent runs passing, against 30/45</div>
+            <div className="stat__label">
+              guarded agent runs passing, against 30/45 unguarded. Claude Haiku 4.5, nine
+              cases, five runs each
+            </div>
             <div className="stat__source">examples/langchain-agent</div>
           </div>
         </div>
@@ -225,8 +231,8 @@ export function Home() {
             <span className="card__kicker">Experiment</span>
             <span className="card__title">The same agent, with and without</span>
             <span className="card__body">
-              Identical model, prompt and tools. The only difference is whether a guard sits
-              under the two tools that write.
+              Identical prompt and tools. Haiku 4.5 went 30/45 to 45/45; an earlier Opus 5
+              suite went 19/21 to 21/21. The only difference is the guard.
             </span>
           </Link>
         </div>
@@ -288,6 +294,38 @@ export function Home() {
               <Link to="/docs/python-api">Read the API reference →</Link>
             </p>
           </div>
+        </div>
+      </section>
+
+      <section>
+        <p className="section__label">Whichever one you are</p>
+        <h2 className="section__title">Three doors, and they are not the same door.</h2>
+        <div className="cards">
+          <Link className="card" to="/docs/use/start-here">
+            <span className="card__kicker">You ship an agent</span>
+            <span className="card__title">Start here</span>
+            <span className="card__body">
+              What it does, what it does not do, and which of the three shapes is yours.
+              GPT-4, Claude, or a hand-written loop: nothing in the guard knows what an LLM
+              is.
+            </span>
+          </Link>
+          <Link className="card" to="/docs/quickstart">
+            <span className="card__kicker">You want to see it</span>
+            <span className="card__title">Quickstart</span>
+            <span className="card__body">
+              Nine lines, one bug McCarthy wrote down in 1998, and a checker that prints
+              the history that breaks it.
+            </span>
+          </Link>
+          <Link className="card" to="/docs/concepts/completeness">
+            <span className="card__kicker">You want the argument</span>
+            <span className="card__title">Proof, not spot check</span>
+            <span className="card__body">
+              The completeness thresholds, the locality lemma, and the experiments that
+              would break each claim.
+            </span>
+          </Link>
         </div>
       </section>
 
