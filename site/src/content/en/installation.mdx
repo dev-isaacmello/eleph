@@ -21,32 +21,53 @@ prover, which is what discharges the obligations.
 Python 3.11 is the floor and is tested in CI on every push, alongside 3.12 and
 3.13.
 
-## From PyPI
+## Into a project
 
 ```bash
-pip install eleph
+uv add eleph          # or:  pip install eleph
 ```
 
-Or with `uv`, which is what the project itself uses:
+That installs the importable package and the `eleph` command.
+
+<Callout type="danger" title="uv add does not put eleph on your PATH">
+`uv add` installs into the project's `.venv`, so the executable lands in
+`.venv/bin/eleph` and the shell will not find it:
 
 ```bash
-uv pip install eleph
+$ eleph check policy.eleph
+zsh: command not found: eleph
 ```
 
-That installs the `eleph` command and the importable package.
-
-## From source
+Reach it through the environment that has it:
 
 ```bash
-git clone https://github.com/dev-isaacmello/eleph && cd eleph
-uv venv && uv pip install -e ".[dev]"
+uv run eleph check policy.eleph     # no activation needed
 ```
 
-The `dev` extra adds `pytest`. Run the suite to confirm the install:
+or activate the environment first:
 
 ```bash
-pytest -q          # 146 tests
+source .venv/bin/activate
+eleph check policy.eleph
 ```
+</Callout>
+
+## As a command, everywhere
+
+If what you want is the CLI rather than a library in one project, install it as
+a tool. It gets its own isolated environment and goes on your PATH:
+
+```bash
+uv tool install eleph
+```
+
+```bash
+$ command -v eleph
+~/.local/bin/eleph
+```
+
+`uv tool uninstall eleph` removes it. With pip, the equivalent is
+[`pipx`](https://pipx.pypa.io/): `pipx install eleph`.
 
 ## Optional extras
 
@@ -64,11 +85,64 @@ uv pip install "eleph[langchain]"
 
 ## Check that it works
 
+Write a file. Nine lines is enough to have something proved:
+
 ```bash
-eleph check examples/airline.eleph
+cat > airline.eleph <<'EOF'
+program airline
+
+event make_reservation(passenger, flight)
+event cancel_reservation(passenger, flight)
+
+fact has_reservation(P, F) := make_reservation(P, F) since_not cancel_reservation(P, F)
+
+on question(Caller, has_reservation(P, F)):
+    answer Caller with has_reservation(P, F)
+EOF
+
+eleph check airline.eleph
 ```
 
-If the install is good you will see the program proved:
+If the install is good, Z3 discharged the obligation and you will see:
+
+```out
+airline.eleph  ->  programa airline
+2 eventos, 1 fato, 1 handler
+
+1 obrigacao derivada do texto do programa
+cada uma checada no seu limiar de completude (o maior: 3 eventos) -- exaustivo
+
+  ok  question(Caller, has_reservation)  linha 9  -  a resposta responde a pergunta feita
+
+PROVADO  -  1 obrigacao vale para TODO historico, de qualquer tamanho
+```
+
+<Callout type="danger" title="The examples are not in the package">
+Nothing under `examples/` or `bench/` is installed by `pip install` or
+`uv add`. Only the `eleph` package is:
+
+```bash
+$ find .venv -name "*.eleph"
+$                                   # nothing
+```
+
+So `eleph check examples/airline.eleph` after a PyPI install fails, and today
+it fails with a Python traceback rather than a message. **Every page on this
+site that names a path under `examples/` assumes you cloned the repository.**
+</Callout>
+
+## For the examples, clone the repository
+
+The quickstart, the concept pages and the CLI reference all quote runs against
+files in the repository. To reproduce them:
+
+```bash
+git clone https://github.com/dev-isaacmello/eleph && cd eleph
+uv venv && uv pip install -e ".[dev]"
+source .venv/bin/activate
+
+eleph check examples/airline.eleph
+```
 
 ```out
 examples/airline.eleph  ->  programa airline
@@ -83,9 +157,5 @@ cada uma checada no seu limiar de completude (o maior: 3 eventos) -- exaustivo
 PROVADO  -  2 obrigacoes valem para TODO historico, de qualquer tamanho
 ```
 
-<Callout type="note" title="Running the examples">
-The `examples/` and `bench/` directories ship in the source distribution but
-are not installed onto your path. To run them, clone the repository. The
-τ-bench audit additionally downloads about 6 MB of published trajectories on
-first use, and skips cleanly with no network.
-</Callout>
+The τ-bench audit additionally downloads about 6 MB of published trajectories
+on first use, and skips cleanly with no network.

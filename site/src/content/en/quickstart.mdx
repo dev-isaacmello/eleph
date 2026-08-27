@@ -11,6 +11,21 @@ have seen the checker produce a history that breaks an obligation nobody wrote
 down.
 </p>
 
+<Callout type="note" title="These commands run against the repository">
+Every path below is a file in the eleph repository, and nothing under
+`examples/` is installed by `pip install` or `uv add`. Clone it first:
+
+```bash
+git clone https://github.com/dev-isaacmello/eleph && cd eleph
+uv venv && uv pip install -e ".[dev]"
+source .venv/bin/activate
+```
+
+If you would rather stay in your own project, the programs on this page are
+printed in full: save one to a file of your own and drop the `examples/`
+prefix. See [installation](/docs/installation).
+</Callout>
+
 ## 1. The program
 
 <Snippet file="examples/airline_buggy.eleph">
