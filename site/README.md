@@ -21,6 +21,8 @@ npm run preview
 | Routing | `src/lib/content.ts` | `import.meta.glob`, lazily, so every page is its own chunk |
 | Search | `scripts/build-search-index.mjs` | one record per heading, generated before `dev` and `build` |
 | Sitemap, robots | same script | generated from the same walk, so they cannot drift from the content |
+| Markdown for agents | `scripts/mdx-to-markdown.mjs` | every page also written as `.md`, plus `llms.txt` and `llms-full.txt` |
+| Program check | `scripts/check-eleph-blocks.py` | runs the real checker over every `eleph` block on the site; wired into CI |
 | Origin | `scripts/origin.mjs` | no domain is written down anywhere; the build reads Vercel's |
 | Highlighting | `src/lib/eleph-grammar.ts` | TextMate grammars for `.eleph` and for what the CLI prints |
 | CJK line breaks | `scripts/remark-cjk-linebreaks.mjs` | drops the space a wrapped source line would otherwise insert mid-word in Chinese |
@@ -76,12 +78,33 @@ plugin runs on it. Keep those on one long line.
 ```text      a grammar, a session script, anything unhighlighted
 ````
 
+## Markdown for agents
+
+Every page is written twice at build time: as MDX for the browser, and as
+Markdown at the same path with `.md` appended. `/llms.txt` indexes them in
+reading order, taken from `nav.ts` so it cannot disagree with the sidebar;
+`/llms-full.txt` is the English corpus in one file. All of it comes from the
+same walk as the search index and the sitemap, so none of it can drift.
+
+The conversion keeps what the components mean rather than dropping the tags: a
+Callout becomes a labelled blockquote, a Snippet keeps the file it quotes, a
+Source becomes the path. **Code fences are never touched.**
+
+None of it is committed; `npm run index` writes it.
+
 ## The rule this site inherits
 
 Every terminal block here is **a real run, pasted**. If the CLI's output
 changes, the pages quoting it need re-pasting rather than editing. The project
 rule is in [CONTRIBUTING.md](../CONTRIBUTING.md): do not publish a number you
 have not read by hand.
+
+The same applies to programs. `scripts/check-eleph-blocks.py` hands every
+complete program printed on the site to `eleph check` and fails on a parser or
+resolver rejection, and CI runs it. It is honest about what it cannot do:
+excerpts have no program around them, and inventing one would test the
+invention rather than the page, so those are counted and skipped rather than
+faked.
 
 ## Deploying
 

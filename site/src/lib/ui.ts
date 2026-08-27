@@ -46,6 +46,10 @@ const STRINGS = {
     calloutProved: 'Proved',
     calloutLimit: 'Limit',
     calloutDanger: 'Careful',
+    copyMarkdown: 'Copy as Markdown',
+    copiedMarkdown: 'Copied',
+    viewMarkdown: 'View as Markdown',
+    forAgents: 'For agents',
   },
   'pt-BR': {
     skipToContent: 'Pular para o conteúdo',
@@ -90,6 +94,10 @@ const STRINGS = {
     calloutProved: 'Provado',
     calloutLimit: 'Limite',
     calloutDanger: 'Atenção',
+    copyMarkdown: 'Copiar como Markdown',
+    copiedMarkdown: 'Copiado',
+    viewMarkdown: 'Ver como Markdown',
+    forAgents: 'Para agentes',
   },
   'zh-CN': {
     skipToContent: '跳到正文',
@@ -134,6 +142,10 @@ const STRINGS = {
     calloutProved: '已证明',
     calloutLimit: '局限',
     calloutDanger: '注意',
+    copyMarkdown: '复制为 Markdown',
+    copiedMarkdown: '已复制',
+    viewMarkdown: '查看 Markdown',
+    forAgents: '给智能体',
   },
 } as const
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 
+import { PageActions } from '@/components/PageActions'
 import { Pager } from '@/components/Pager'
 import { Toc } from '@/components/Toc'
 import { mdxComponents } from '@/components/mdx'
@@ -76,6 +77,7 @@ export function DocPage() {
               <Link to={href('/docs')}>{t.breadcrumbRoot}</Link>
               <span aria-hidden="true">/</span>
               <span>{group.title}</span>
+              <PageActions route={route} />
             </nav>
           ) : null}
 

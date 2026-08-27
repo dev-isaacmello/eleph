@@ -54,6 +54,12 @@ export function Footer() {
           </div>
 
           <div className="footer__links" style={{ marginTop: '0.6rem' }}>
+            <span style={{ color: 'var(--fg-faint)' }}>{t.forAgents}</span>
+            <a href="/llms.txt">llms.txt</a>
+            <a href="/llms-full.txt">llms-full.txt</a>
+          </div>
+
+          <div className="footer__links" style={{ marginTop: '0.6rem' }}>
             <span style={{ color: 'var(--fg-faint)' }}>{t.footerAlsoIn}</span>
             {README_TRANSLATIONS.map((l) => (
               <a key={l.code} href={l.href} target="_blank" rel="noreferrer" lang={l.code}>
