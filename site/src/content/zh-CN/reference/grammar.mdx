@@ -121,8 +121,9 @@ permitted  offer
   `linha N: use espacos, nao tabs, para indentar`。
 * 减少缩进时必须回到某个曾经打开过的层级，否则：
   `linha N: indentacao inconsistente`。
-* 没有续行。跨行的表达式必须写在已经缩进的块内并加括号 —— 实践中，把事实写在一行里，
-  或者在 `:=` 之后换行。
+* **没有续行。** 一条 `fact` 的主体必须写在一行里：在 `:=` 之后换行会得到
+  `esperava nome de evento ou fato, veio 'NEWLINE'`，因为词法分析器发出的 NEWLINE
+  在解析器里没有对应规则。处理器主体可以跨行，是因为缩进开启了一个块；别的地方都不行。
 
 ## 错误
 

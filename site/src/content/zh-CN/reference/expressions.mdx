@@ -101,11 +101,9 @@ if spoke accept to C about make_reservation(P, F):
 ```eleph
 event charged_while_active(u: User, c: Charge, amount: Number)
 
-fact refundable(U: User, C: Charge) :=
-    charged_after_cancelling(U, C, amount > 0) since_not refunded(U, C)
+fact refundable(U: User, C: Charge) := charged_after_cancelling(U, C, amount > 0) since_not refunded(U, C)
 
-fact within_limit(U: User, C: Charge) :=
-    charged_after_cancelling(U, C, amount <= 200) since_not refunded(U, C)
+fact within_limit(U: User, C: Charge) := charged_after_cancelling(U, C, amount <= 200) since_not refunded(U, C)
 ```
 
 参数位置上的比较会约束该事件的一个数值字段。这个比较是**原子身份的一部分**，而不是一条

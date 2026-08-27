@@ -14,8 +14,7 @@ happened.
 ## A fact is a formula
 
 ```eleph
-fact has_reservation(P: Passenger, F: Flight) :=
-    make_reservation(P, F) since_not cancel_reservation(P, F)
+fact has_reservation(P: Passenger, F: Flight) := make_reservation(P, F) since_not cancel_reservation(P, F)
 ```
 
 `has_reservation` is not a column, a cache, or a field on an object. It is the

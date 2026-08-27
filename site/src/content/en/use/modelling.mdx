@@ -85,8 +85,7 @@ identity:
 event charged_while_active(u: User, c: Charge, amount: Number)
 event charged_after_cancelling(u: User, c: Charge, amount: Number)
 
-fact refundable(U: User, C: Charge) :=
-    charged_after_cancelling(U, C, amount > 0) since_not refunded(U, C)
+fact refundable(U: User, C: Charge) := charged_after_cancelling(U, C, amount > 0) since_not refunded(U, C)
 ```
 
 Two events instead of one, and the composition is gone.
@@ -119,8 +118,7 @@ A comparison in an argument position constrains a numeric field, **at the
 instant the event happens**:
 
 ```eleph
-fact within_limit(U: User, C: Charge) :=
-    charged_after_cancelling(U, C, amount <= 200) since_not refunded(U, C)
+fact within_limit(U: User, C: Charge) := charged_after_cancelling(U, C, amount <= 200) since_not refunded(U, C)
 ```
 
 That is what keeps the [completeness argument](/docs/concepts/completeness)

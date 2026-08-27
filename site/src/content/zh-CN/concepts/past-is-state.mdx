@@ -13,8 +13,7 @@ description: eleph 的文法里没有赋值。事实不是被存储的，它是�
 ## 事实是一条公式
 
 ```eleph
-fact has_reservation(P: Passenger, F: Flight) :=
-    make_reservation(P, F) since_not cancel_reservation(P, F)
+fact has_reservation(P: Passenger, F: Flight) := make_reservation(P, F) since_not cancel_reservation(P, F)
 ```
 
 `has_reservation` 不是一列、一个缓存，也不是某个对象上的字段。它是这样一句话：*「在最后

@@ -14,8 +14,7 @@ aconteceu.
 ## Um fato é uma fórmula
 
 ```eleph
-fact has_reservation(P: Passenger, F: Flight) :=
-    make_reservation(P, F) since_not cancel_reservation(P, F)
+fact has_reservation(P: Passenger, F: Flight) := make_reservation(P, F) since_not cancel_reservation(P, F)
 ```
 
 `has_reservation` não é uma coluna, um cache, nem um campo de objeto. É a frase

@@ -47,6 +47,14 @@ jobs:
       - name: the three integration shapes run
         run: uv run python examples/agente.py > /dev/null
 
+      # A language site that prints a program which does not parse is making a
+      # claim it never ran. This caught three: a fact wrapped across lines, in
+      # eighteen files, and an event used in a fact without being declared, on
+      # the page that teaches program structure.
+      - name: every program printed on the docs site is a program
+        if: matrix.python == '3.13'
+        run: uv run python site/scripts/check-eleph-blocks.py
+
   build:
     runs-on: ubuntu-latest
     steps:

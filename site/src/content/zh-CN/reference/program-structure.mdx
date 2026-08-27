@@ -19,9 +19,9 @@ sort Passenger
 sort Flight
 
 event make_reservation(p: Passenger, f: Flight)
+event cancel_reservation(p: Passenger, f: Flight)
 
-fact has_reservation(P: Passenger, F: Flight) :=
-    make_reservation(P, F) since_not cancel_reservation(P, F)
+fact has_reservation(P: Passenger, F: Flight) := make_reservation(P, F) since_not cancel_reservation(P, F)
 
 on question(C, has_reservation(P, F)):
     answer C with has_reservation(P, F)
@@ -79,11 +79,9 @@ event close_flight(f: Flight)
 ## `fact`
 
 ```eleph
-fact has_seat(P: Passenger, F: Flight) :=
-    assign_seat(P, F) since_not cancel_reservation(P, F)
+fact has_seat(P: Passenger, F: Flight) := assign_seat(P, F) since_not cancel_reservation(P, F)
 
-fact seats_left(F: Flight) :=
-    count P: Passenger where has_reservation(P, F) < 2
+fact seats_left(F: Flight) := count P: Passenger where has_reservation(P, F) < 2
 
 fact flight_open(F: Flight) := not close_flight(F)
 ```

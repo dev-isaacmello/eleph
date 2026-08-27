@@ -123,9 +123,10 @@ The list is in <Source file="eleph/lexer.py" />, in this order.
   `linha N: use espacos, nao tabs, para indentar`.
 * A dedent must return to a level that was previously opened, or:
   `linha N: indentacao inconsistente`.
-* There is no line continuation. An expression spanning lines must be
-  parenthesised inside a block that is already indented — in practice, keep
-  facts on one line or break after `:=`.
+* **There is no line continuation.** A `fact` body must sit on one line:
+  breaking after `:=` gives `esperava nome de evento ou fato, veio 'NEWLINE'`,
+  because the lexer emits a NEWLINE the parser has no rule for. Handler bodies
+  span lines because indentation opens a block; nothing else does.
 
 ## Errors
 

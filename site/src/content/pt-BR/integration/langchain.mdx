@@ -114,10 +114,8 @@ praticamente nenhum sistema confere:
 ```eleph
 fact autorizado(Q: Party, U: User) := autenticou(Q, U) since_not deslogou(Q, U)
 fact active(U: User) := subscribed(U) since_not cancelled(U)
-fact refundable(U: User, C: Charge) :=
-    charged_after_cancelling(U, C, amount > 0) since_not refunded(U, C)
-fact within_limit(U: User, C: Charge) :=
-    charged_after_cancelling(U, C, amount <= 200) since_not refunded(U, C)
+fact refundable(U: User, C: Charge) := charged_after_cancelling(U, C, amount > 0) since_not refunded(U, C)
+fact within_limit(U: User, C: Charge) := charged_after_cancelling(U, C, amount <= 200) since_not refunded(U, C)
 fact may_refund(U: User, C: Charge) := refundable(U, C) and within_limit(U, C)
 ```
 </Snippet>

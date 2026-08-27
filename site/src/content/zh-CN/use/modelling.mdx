@@ -76,8 +76,7 @@ guard.require("refundable", "ana", "c1")   # 现在通过了
 event charged_while_active(u: User, c: Charge, amount: Number)
 event charged_after_cancelling(u: User, c: Charge, amount: Number)
 
-fact refundable(U: User, C: Charge) :=
-    charged_after_cancelling(U, C, amount > 0) since_not refunded(U, C)
+fact refundable(U: User, C: Charge) := charged_after_cancelling(U, C, amount > 0) since_not refunded(U, C)
 ```
 
 两个事件代替一个，组合问题就消失了。
@@ -106,8 +105,7 @@ guard.record("refund_window_closed", user, charge)
 参数位置上的比较会约束一个数值字段，**在该事件发生的那一刻**：
 
 ```eleph
-fact within_limit(U: User, C: Charge) :=
-    charged_after_cancelling(U, C, amount <= 200) since_not refunded(U, C)
+fact within_limit(U: User, C: Charge) := charged_after_cancelling(U, C, amount <= 200) since_not refunded(U, C)
 ```
 
 这正是[完备性论证](/docs/concepts/completeness)得以成立的原因，同时也是它的局限：你可以

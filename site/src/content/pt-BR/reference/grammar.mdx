@@ -124,9 +124,11 @@ A lista está em <Source file="eleph/lexer.py" />, nesta ordem.
   `linha N: use espacos, nao tabs, para indentar`.
 * Um dedent tem que voltar a um nível previamente aberto, ou:
   `linha N: indentacao inconsistente`.
-* Não há continuação de linha. Uma expressão que atravessa linhas tem que estar
-  entre parênteses dentro de um bloco já indentado — na prática, mantenha fatos
-  numa linha ou quebre depois do `:=`.
+* **Não há continuação de linha.** O corpo de um `fact` tem que caber numa
+  linha: quebrar depois do `:=` dá `esperava nome de evento ou fato, veio
+  'NEWLINE'`, porque o lexer emite um NEWLINE para o qual o parser não tem
+  regra. Corpos de handler atravessam linhas porque a indentação abre um bloco;
+  nada mais faz isso.
 
 ## Erros
 

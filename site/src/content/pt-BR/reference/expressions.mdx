@@ -111,11 +111,9 @@ exatamente isto?"* não é expressável. *"Já prometi alguma coisa aqui?"* é.
 ```eleph
 event charged_while_active(u: User, c: Charge, amount: Number)
 
-fact refundable(U: User, C: Charge) :=
-    charged_after_cancelling(U, C, amount > 0) since_not refunded(U, C)
+fact refundable(U: User, C: Charge) := charged_after_cancelling(U, C, amount > 0) since_not refunded(U, C)
 
-fact within_limit(U: User, C: Charge) :=
-    charged_after_cancelling(U, C, amount <= 200) since_not refunded(U, C)
+fact within_limit(U: User, C: Charge) := charged_after_cancelling(U, C, amount <= 200) since_not refunded(U, C)
 ```
 
 Uma comparação numa posição de argumento restringe um campo numérico do evento. A
