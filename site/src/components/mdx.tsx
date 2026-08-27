@@ -206,11 +206,26 @@ export function Callout({
  */
 function Anchor({ href = '', children, ...rest }: ComponentPropsWithoutRef<'a'>) {
   const { href: localised } = useLocale()
-  if (href.startsWith('/')) {
+
+  // A Markdown or text endpoint is a file the server hands over, not a route
+  // the router knows. Sending it through the router lands on "page not found".
+  const isFile = /\.(md|txt|json|xml)$/.test(href)
+
+  if (href.startsWith('/') && !isFile) {
     return (
       <Link to={localised(href)} {...rest}>
         {children}
       </Link>
+    )
+  }
+  if (href.startsWith('/')) {
+    // A page's Markdown lives beside the page, so it takes the locale. The
+    // index files live at the root and do not.
+    const to = href.startsWith('/docs/') || href === '/docs.md' ? localised(href) : href
+    return (
+      <a href={to} {...rest}>
+        {children}
+      </a>
     )
   }
   if (href.startsWith('#')) {

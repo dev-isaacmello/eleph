@@ -72,7 +72,12 @@ export interface NavGroup {
 const STRUCTURE: { group: string; items: string[] }[] = [
   {
     group: 'use',
-    items: ['/docs/use/start-here', '/docs/use/any-model', '/docs/use/modelling'],
+    items: [
+      '/docs/use/start-here',
+      '/docs/use/any-model',
+      '/docs/use/with-your-assistant',
+      '/docs/use/modelling',
+    ],
   },
   {
     group: 'intro',
@@ -121,6 +126,7 @@ const TITLES: Record<Locale, { groups: Record<string, string>; pages: Record<str
     pages: {
       '/docs/use/start-here': 'Start here',
       '/docs/use/any-model': 'Any model, any framework',
+      '/docs/use/with-your-assistant': 'With your coding assistant',
       '/docs/use/modelling': 'Modelling your domain',
       '/docs': 'What eleph is',
       '/docs/installation': 'Installation',
@@ -159,6 +165,7 @@ const TITLES: Record<Locale, { groups: Record<string, string>; pages: Record<str
     pages: {
       '/docs/use/start-here': 'Comece por aqui',
       '/docs/use/any-model': 'Qualquer modelo, qualquer framework',
+      '/docs/use/with-your-assistant': 'Com seu assistente',
       '/docs/use/modelling': 'Modelando seu domínio',
       '/docs': 'O que é o eleph',
       '/docs/installation': 'Instalação',
@@ -197,6 +204,7 @@ const TITLES: Record<Locale, { groups: Record<string, string>; pages: Record<str
     pages: {
       '/docs/use/start-here': '从这里开始',
       '/docs/use/any-model': '任何模型，任何框架',
+      '/docs/use/with-your-assistant': '配合你的编程助手',
       '/docs/use/modelling': '为你的领域建模',
       '/docs': 'eleph 是什么',
       '/docs/installation': '安装',

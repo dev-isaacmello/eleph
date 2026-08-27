@@ -1,0 +1,152 @@
+---
+title: Com seu assistente de código
+description: Um servidor MCP que prova sua política, uma skill que carrega o laço, e cada página servida como Markdown. Para Claude Code, Cursor, Copilot e qualquer coisa que leia uma URL.
+---
+
+# Com seu assistente de código
+
+<p className="lede">
+Você vai escrever a política com a ajuda de um modelo. O risco disso é óbvio: um
+modelo consegue produzir um arquivo <code>.eleph</code> que lê certo e está
+errado, que é exatamente a falha que esta linguagem existe para pegar. Então a
+ferramenta aqui não entrega documentação ao modelo e torce. Ela entrega o
+verificador.
+</p>
+
+## O servidor MCP
+
+```bash
+uvx --from "eleph[mcp]" eleph-mcp
+```
+
+Quatro ferramentas. Todas sem estado: entra texto, sai veredito. Nada é escrito
+em disco, nada é buscado na rede.
+
+| Ferramenta | O que responde |
+|---|---|
+| `eleph_check` | toda obrigação vale? e se não, qual histórico a quebra |
+| `eleph_obligations` | o que este arquivo promete, sem tentar descarregar |
+| `eleph_simulate` | reexecute estes eventos; o que é verdade, e o que seria recusado |
+| `eleph_declarations` | o que esta política declara, com cada fato expandido |
+
+### Ligando
+
+<Snippet title="claude_desktop_config.json, .cursor/mcp.json, e a maioria dos outros">
+```json
+{
+  "mcpServers": {
+    "eleph": {
+      "command": "uvx",
+      "args": ["--from", "eleph[mcp]", "eleph-mcp"]
+    }
+  }
+}
+```
+</Snippet>
+
+As mesmas quatro linhas funcionam em Claude Code, Claude Desktop, Cursor,
+Windsurf e Zed. O `uvx` busca num ambiente descartável, então nada cai no seu
+projeto nem no seu `PATH`.
+
+<Callout type="note" title="A primeira execução baixa cerca de 51 MB">
+Quase nada disso é o eleph, que tem 53 KB. É o Z3. Você está instalando um
+provador de teoremas, e é esse o ponto inteiro: buscar uma página de
+documentação não precisaria dele.
+</Callout>
+
+### Como fica o laço
+
+> **você:** escreve uma política que só permite reembolsar cobrança que caiu
+> depois do cancelamento
+
+O modelo escreve uma e chama `eleph_check`. Ele recebe de volta não uma opinião:
+
+```out
+  X   question(C, refundable)  linha 12  -  resposta yes e verdadeira
+
+      historico que quebra a obrigacao:
+        1. charged(U, C)
+        2. cancelled(U)
+
+      o programa responde yes, a verdade do log e no
+```
+
+Dois eventos. O modelo lê e corrige a regra. **Um contraexemplo é uma coisa em
+que modelo consegue agir**, e ele veio de rodar o solver, não do julgamento de
+alguém.
+
+<Callout type="proved" title="Interrogue a regra, não só faça ela passar">
+`eleph_simulate` é a ferramenta para a pergunta que uma prova não responde. Uma
+prova diz que cada obrigação vale; ela não diz que a política é a que você
+queria. Reexecute o caso que te preocupa e veja o que a guarda de fato faz.
+
+Foi assim que o buraco de composição no [exemplo com
+LangChain](/docs/integration/langchain) apareceu: numa política que estava
+`PROVADO` antes e depois da correção.
+</Callout>
+
+## A skill
+
+Para Claude Code e Claude Desktop, o <Source file="skills/eleph/SKILL.md" />
+carrega o procedimento em vez da superfície da API: o laço acima, a tradução das
+colunas que você já tem para eventos e fatos, a armadilha do átomo nu, e os
+limites que significam que uma regra não é expressável.
+
+```bash
+git clone https://github.com/dev-isaacmello/eleph
+mkdir -p ~/.claude/skills
+cp -r eleph/skills/eleph ~/.claude/skills/
+```
+
+A primeira regra dela é a que importa: **nunca entregar um arquivo `.eleph` que
+não passou pelo verificador.** Com o servidor MCP instalado, ela tem o
+verificador à mão.
+
+Para editores sem skills, o mesmo arquivo serve como arquivo de regras: o Cursor
+lê `.cursor/rules/`, o Copilot lê `.github/copilot-instructions.md`, e várias
+ferramentas já leem `AGENTS.md`. É Markdown puro; copie para onde o seu procura.
+
+## Cada página como Markdown
+
+Sem instalar nada, funciona com qualquer coisa que busque uma URL.
+
+| | |
+|---|---|
+| [`/llms.txt`](/llms.txt) | o índice, em ordem de leitura |
+| [`/llms-full.txt`](/llms-full.txt) | toda a documentação em inglês num arquivo |
+| qualquer página + `.md` | [`/docs/use/modelling.md`](/docs/use/modelling.md), e assim por diante |
+
+Nos três idiomas: `/pt-BR/docs/….md`, `/zh-CN/docs/….md`.
+
+Isso é gerado do mesmo walk que constrói o índice de busca e o sitemap, então o
+Markdown que um modelo lê e a página que você lê não podem discordar. Aponte seu
+assistente para o `/llms.txt` e ele escolhe a página que precisa em vez de
+adivinhar a superfície da API.
+
+## Qual das três você quer
+
+<Steps>
+<li>
+**Só lendo a documentação?** Os endpoints Markdown. Nada a instalar.
+</li>
+<li>
+**Escrevendo políticas com um modelo?** O servidor MCP. É o único que
+transforma um palpite numa prova.
+</li>
+<li>
+**Usando Claude Code todo dia?** Os dois, mais a skill, para você não ter que
+lembrar de pedir a verificação.
+</li>
+</Steps>
+
+## Próximo
+
+<Steps>
+<li>
+[**Comece por aqui**](/docs/use/start-here) — o que o eleph faz e o que não faz.
+</li>
+<li>
+[**Modelando seu domínio**](/docs/use/modelling) — a parte que o modelo não faz
+por você.
+</li>
+</Steps>

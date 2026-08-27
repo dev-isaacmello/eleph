@@ -414,6 +414,19 @@
   color: var(--accent);
 }
 
+/* A title with no link is still a title: it must wrap rather than push the
+   page sideways. The anchored case was already handled; this is the plain one,
+   and it only showed up in Chinese, where the title had no spaces to break at. */
+.code-block__head > span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.code-block__head > .code-block__lang {
+  overflow-wrap: normal;
+  white-space: nowrap;
+}
+
 /* A Snippet owns the frame, so the fence inside it must not draw its own. */
 .code-block__head + .shiki,
 .code-block__head + pre {

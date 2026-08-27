@@ -113,33 +113,6 @@ export function Home() {
           </div>
         </div>
       </section>
-
-      <section>
-        <p className="section__label">{c.stateLabel}</p>
-        <h2 className="section__title">{c.stateTitle}</h2>
-        <p className="section__lede">{c.stateLede}</p>
-        <div className="demo">
-          <div className="panel">
-            <div className="panel__head">
-              <span className="panel__dot" />
-              {c.factPanel}
-            </div>
-            <div className="prose">
-              <Fact components={BARE} />
-            </div>
-            <p className="panel__note">{c.factNote}</p>
-          </div>
-          <Cards items={c.cards.slice(0, 2)} href={href} />
-        </div>
-      </section>
-
-      <section>
-        <p className="section__label">{c.obligationsLabel}</p>
-        <h2 className="section__title">{c.obligationsTitle}</h2>
-        <p className="section__lede">{c.obligationsLede}</p>
-        <Cards items={c.cards} href={href} />
-      </section>
-
       <section>
         <p className="section__label">{c.measuredLabel}</p>
         <h2 className="section__title">{c.measuredTitle}</h2>
@@ -154,7 +127,6 @@ export function Home() {
         </div>
         <Cards items={c.measuredCards} href={href} />
       </section>
-
       <section>
         <p className="section__label">{c.pythonLabel}</p>
         <h2 className="section__title">{c.pythonTitle}</h2>
@@ -199,7 +171,30 @@ export function Home() {
           </div>
         </div>
       </section>
-
+      <section>
+        <p className="section__label">{c.stateLabel}</p>
+        <h2 className="section__title">{c.stateTitle}</h2>
+        <p className="section__lede">{c.stateLede}</p>
+        <div className="demo">
+          <div className="panel">
+            <div className="panel__head">
+              <span className="panel__dot" />
+              {c.factPanel}
+            </div>
+            <div className="prose">
+              <Fact components={BARE} />
+            </div>
+            <p className="panel__note">{c.factNote}</p>
+          </div>
+          <Cards items={c.cards.slice(0, 2)} href={href} />
+        </div>
+      </section>
+      <section>
+        <p className="section__label">{c.obligationsLabel}</p>
+        <h2 className="section__title">{c.obligationsTitle}</h2>
+        <p className="section__lede">{c.obligationsLede}</p>
+        <Cards items={c.cards} href={href} />
+      </section>
       <section>
         <p className="section__label">{c.doorsLabel}</p>
         <h2 className="section__title">{c.doorsTitle}</h2>

@@ -1,0 +1,123 @@
+---
+title: 配合你的编程助手
+description: 一个会证明你的策略的 MCP 服务器、一个承载工作循环的 skill，以及以 Markdown 提供的每一页。适用于 Claude Code、Cursor、Copilot，以及任何能抓取 URL 的工具。
+---
+
+# 配合你的编程助手
+
+<p className="lede">
+你会在模型的帮助下写这份策略。风险很明显：模型能写出一个读起来正确、实际上是错的 <code>.eleph</code> 文件，而这恰恰是这门语言存在要抓住的失败。所以这里的工具不是把文档递给模型然后祈祷，而是把检查器递给它。
+</p>
+
+## MCP 服务器
+
+```bash
+uvx --from "eleph[mcp]" eleph-mcp
+```
+
+四个工具。全部无状态：进去是文本，出来是结论。不写磁盘，不走网络。
+
+| 工具 | 回答什么 |
+|---|---|
+| `eleph_check` | 每条义务是否都成立；若不成立，哪段历史推翻了它 |
+| `eleph_obligations` | 这个文件承诺了什么，不去消解 |
+| `eleph_simulate` | 重放这些事件；什么为真，什么会被拒绝 |
+| `eleph_declarations` | 这份策略声明了什么，每条事实都展开 |
+
+### 接上去
+
+<Snippet title="claude_desktop_config.json、.cursor/mcp.json，以及大多数其他客户端">
+```json
+{
+  "mcpServers": {
+    "eleph": {
+      "command": "uvx",
+      "args": ["--from", "eleph[mcp]", "eleph-mcp"]
+    }
+  }
+}
+```
+</Snippet>
+
+同样这四行在 Claude Code、Claude Desktop、Cursor、Windsurf 和 Zed 里都能用。`uvx` 拉取到一个用完即弃的环境里，所以你的项目和 `PATH` 里都不会多出任何东西。
+
+<Callout type="note" title="第一次运行会拉大约 51 MB">
+其中几乎没有一点是 eleph，它只有 53 KB。那是 Z3。你在安装一个定理证明器，而这正是全部要点：光是抓一页文档并不需要它。
+</Callout>
+
+### 这个循环长什么样
+
+> **你：** 写一份策略，只允许退那种在取消之后落账的费用
+
+模型写了一份，然后调用 `eleph_check`。它拿回来的不是一个意见：
+
+```out
+  X   question(C, refundable)  linha 12  -  resposta yes e verdadeira
+
+      historico que quebra a obrigacao:
+        1. charged(U, C)
+        2. cancelled(U)
+
+      o programa responde yes, a verdade do log e no
+```
+
+两个事件。模型读完就去改规则。**反例是模型真正能据以行动的东西**，而它来自运行求解器，不是来自任何人的判断。
+
+<Callout type="proved" title="去审问规则，而不只是让它通过">
+`eleph_simulate` 是用来回答那个证明回答不了的问题的。证明说的是每条义务都成立；它没说这份策略就是你想要的那一份。把你担心的那个案例重放一遍，看看守卫实际会怎么做。
+
+[LangChain 示例](/docs/integration/langchain)里那个组合漏洞就是这样被找出来的：一份在修改前后都是 `PROVADO` 的策略。
+</Callout>
+
+## Skill
+
+对 Claude Code 和 Claude Desktop，<Source file="skills/eleph/SKILL.md" /> 承载的是流程而不是 API 表面：上面那个循环、从你已有的列到事件和事实的翻译、裸原子的陷阱，以及那些意味着某条规则无法表达的局限。
+
+```bash
+git clone https://github.com/dev-isaacmello/eleph
+mkdir -p ~/.claude/skills
+cp -r eleph/skills/eleph ~/.claude/skills/
+```
+
+它的第一条规则才是要紧的那条：**永远不要交出一个没有经过检查器的 `.eleph` 文件。** 装了 MCP 服务器之后，它手边就有那个检查器。
+
+对没有 skill 机制的编辑器，同一个文件当规则文件用就行：Cursor 读 `.cursor/rules/`，Copilot 读 `.github/copilot-instructions.md`，好几个工具现在读 `AGENTS.md`。它就是纯 Markdown，复制到你的工具找的地方即可。
+
+## 每一页都是 Markdown
+
+不用装任何东西，任何能抓 URL 的工具都能用。
+
+| | |
+|---|---|
+| [`/llms.txt`](/llms.txt) | 索引，按阅读顺序 |
+| [`/llms-full.txt`](/llms-full.txt) | 全部英文文档，一个文件 |
+| 任意页面加 `.md` | [`/docs/use/modelling.md`](/docs/use/modelling.md)，依此类推 |
+
+三种语言都有：`/pt-BR/docs/….md`、`/zh-CN/docs/….md`。
+
+这些是由构建搜索索引和站点地图的同一次遍历生成的，所以模型读到的 Markdown 和你读到的页面不可能不一致。把你的助手指向 `/llms.txt`，它就能挑出自己需要的那一页，而不是去猜 API 表面。
+
+## 三样里你要哪一样
+
+<Steps>
+<li>
+**只是读文档？** 用 Markdown 端点。什么都不用装。
+</li>
+<li>
+**在用模型写策略？** 用 MCP 服务器。只有它能把猜测变成证明。
+</li>
+<li>
+**每天都在用 Claude Code？** 两个都要，再加上 skill，这样你就不必记得去要求检查。
+</li>
+</Steps>
+
+## 接下来
+
+<Steps>
+<li>
+[**从这里开始**](/docs/use/start-here) —— eleph 做什么，不做什么。
+</li>
+<li>
+[**为你的领域建模**](/docs/use/modelling) —— 模型替你做不了的那部分。
+</li>
+</Steps>
