@@ -206,70 +206,31 @@ g.outstanding()        # what is still owed, to whom
 ## 对照已发表的 benchmark 进行度量
 
 [τ-bench](https://arxiv.org/abs/2406.12045)（ICLR 2025）给一个航空公司客服智能体
-提供了一份成文的策略。它的第一条规则：
+提供了一份成文的策略，其中两次声明**「API 不会替智能体检查这些」**，并通过对最终
+数据库做哈希来为每次运行打分。这条义务被写了出来，却既未被强制执行，也未被度量。
 
-> 在执行任何会更新订票数据库的操作之前，你必须列出该操作的细节，并取得用户明确的
-> 确认（yes）才能继续。
-
-这份策略随后两次声明：**「API 不会替智能体检查这些。」**
-而奖励函数对最终数据库做哈希，因此一次未经确认、却落到了正确状态上的写入，得分与
-一次经过确认的写入完全相同。这条义务被写了出来，却既未被强制执行，也未被度量。
-
-那条规则就是一个 `fact`。重放已发表的 200 条 gpt-4o 航空轨迹：
+其中两条规则在这里被写成 `.eleph` 事实，并在已发表的 200 条 gpt-4o 航空轨迹上重放：
 
 ```
-$ python bench/taubench/check.py
+$ python bench/taubench/check.py         # the confirmation rule
+  gasta na acao                 85 escritas sem confirmacao,  8 em execucoes pontuadas como sucesso
+  expira no turno               52 escritas sem confirmacao,  4 em execucoes pontuadas como sucesso
 
-  200 execucoes publicadas, 250 escritas no banco
-  84 pontuadas como SUCESSO (42%, o pass^1 publicado e 0.420)
-
-  leitura                 escritas  execucoes  sucessos com
-                         sem conf.   afetadas      violacao
-  gasta na acao                 85   45 (22%)     8 (10%)
-  expira no turno               52   24 (12%)     4 ( 5%)
+$ python bench/taubench/cancel_check.py  # cancellation eligibility
+  seguro E motivo coberto       38 cancelamentos proibidos, 26 deles no gabarito anotado
+  ter seguro basta              16 cancelamentos proibidos,  7 deles no gabarito anotado
 ```
 
-这句话并没有说清一个「yes」覆盖的是一次操作还是一批操作，所以两种读法都被写了下来，
-各对应一个 `fact`。它们之间**没有强弱顺序**：有 25 次运行只被第一种读法标记，4 次只被
-第二种标记，20 次两种都标记。团队没法靠挑那条更宽松的规则来了结此事，因为根本不存在
-这样一条规则。
-
-### API 拒绝检查的那条规则
-
-取消资格是更有力的证据，因为 `cancel_reservation` *什么都不校验*。wiki 自己也清楚：
-**「API 不会替智能体检查这些，所以智能体必须在调用 API 之前确认这些规则成立！」**
-惊叹号是他们自己加的。
-
-```
-$ python bench/taubench/cancel_check.py
-
-  leitura de 'the condition is met'       proibidos  no gabarito
-  seguro E motivo coberto (como o tau3 escreveu)         38           26
-  ter seguro basta                                       16            7
-
-  proibidos sob AMBAS as leituras: 16  (9 reservas distintas)
-```
-
-把那条规则写下来，带出了两件事。
-
-*「仅当购买了旅行保险**且条件得到满足**时」*这句话从未说明是哪个条件。严格读来，它禁止
-38 次取消，而其中 26 次是**带标注的标准答案自己执行的**。这处欠规范波及的是黄金标签，
-而不只是智能体。τ³-bench 后来重写的正是这句话，明确写出了「取消原因在保险承保范围
-之内」。这次形式化落在了它的作者们后来去修补的那句话上，而且没有任何人提示去那里看。
-
-还有一笔订单，`XEHM4B`（经济舱、无保险、十四天前预订、航空公司未取消任何航班），
-在一次被评为 1.0 的运行中，被标准答案本身取消了。无论这句话怎么读，它都是被禁止的。
-
-走到这一步经过了三次修正，每一次都是靠手工阅读具体案例发现的，而不是靠信任那个数字：
-第一次统计把一个「yes」之下的一批写入都算了进去；第二次把「先升舱再取消」判成违规，
-而策略明确允许这样做；第三次用「曾经发生过一次」来建模舱位，而舱位是一个会**变化**的
-属性，这正是 `since_not` 存在的意义。
+把这些规则写下来，带来了比统计违规次数更有意思的结果：这两句话都**在会波及黄金标签
+的层面上存在歧义**，而该 benchmark 的后续版本重写了其中一句。这次形式化落在了它上面，
+而且没有任何人提示去那里看。
 
 这并不是在主张 τ-bench 是错的。它的奖励函数有文档、也是刻意设计的，论文本身就直言
-`r = 1`「可能是必要条件而非充分条件」。这里的主张更狭窄，也可核查：一个智能体被要求
-遵守的承诺，并没有被那个度量智能体的东西所度量，而度量它只需要一行。
+`r = 1`「可能是必要条件而非充分条件」。这里的主张更狭窄：一个智能体被要求遵守的承诺，
+并没有被那个度量智能体的东西所度量，而度量它只需要一行。
 
-`tests/test_taubench.py` 固定了上面的每一个数字。
+完整的审计过程，包括两处歧义以及每个数字各自经受住了哪些检验，见
+[`bench/README.md`](../bench/README.md)。`tests/test_taubench.py` 固定了上面的每一个数字。
 
 ## 语言
 

@@ -231,82 +231,37 @@ nunca terminou de ser escrito é um evento que não aconteceu.
 ## Medido contra um benchmark publicado
 
 O [τ-bench](https://arxiv.org/abs/2406.12045) (ICLR 2025) dá a um agente de
-atendimento de companhia aérea uma política escrita. Sua primeira regra:
+atendimento de companhia aérea uma política escrita, diz duas vezes que **"a API
+não verifica isso pelo agente"**, e pontua as execuções aplicando hash ao banco
+de dados final. A obrigação está declarada, não é imposta e não é medida.
 
-> Antes de executar qualquer ação que atualize o banco de dados de reservas,
-> você deve listar os detalhes da ação e obter confirmação explícita do usuário
-> (yes) para prosseguir.
-
-A política então diz, duas vezes, **"A API não verifica isso pelo agente."** E
-a recompensa aplica hash ao banco de dados final, de modo que uma escrita não
-confirmada que chega ao estado certo pontua exatamente como uma confirmada. A
-obrigação está declarada, não é imposta e não é medida.
-
-Essa regra é um `fact`. Reproduzindo as 200 trajetórias de companhia aérea do
-gpt-4o publicadas:
+Duas de suas regras estão escritas aqui como fatos `.eleph` e reproduzidas sobre
+as 200 trajetórias de companhia aérea do gpt-4o publicadas:
 
 ```
-$ python bench/taubench/check.py
+$ python bench/taubench/check.py         # the confirmation rule
+  gasta na acao                 85 escritas sem confirmacao,  8 em execucoes pontuadas como sucesso
+  expira no turno               52 escritas sem confirmacao,  4 em execucoes pontuadas como sucesso
 
-  200 execucoes publicadas, 250 escritas no banco
-  84 pontuadas como SUCESSO (42%, o pass^1 publicado e 0.420)
-
-  leitura                 escritas  execucoes  sucessos com
-                         sem conf.   afetadas      violacao
-  gasta na acao                 85   45 (22%)     8 (10%)
-  expira no turno               52   24 (12%)     4 ( 5%)
+$ python bench/taubench/cancel_check.py  # cancellation eligibility
+  seguro E motivo coberto       38 cancelamentos proibidos, 26 deles no gabarito anotado
+  ter seguro basta              16 cancelamentos proibidos,  7 deles no gabarito anotado
 ```
 
-A frase não diz se um "yes" cobre uma ação ou um lote, então as duas leituras
-são escritas, um `fact` para cada. Elas **não são ordenadas**: em 25 execuções
-só a primeira acusa, em 4 só a segunda, em 20 as duas. Um time não pode
-resolver isso escolhendo a regra mais permissiva, porque não existe uma.
-
-### A regra que a API se recusa a verificar
-
-A elegibilidade para cancelamento é evidência mais forte, porque
-`cancel_reservation` não valida *absolutamente nada*. A wiki sabe disso: **"A
-API não verifica isso pelo agente, então o agente precisa garantir que as
-regras se aplicam antes de chamar a API!"**, o ponto de exclamação é deles.
-
-```
-$ python bench/taubench/cancel_check.py
-
-  leitura de 'the condition is met'       proibidos  no gabarito
-  seguro E motivo coberto (como o tau3 escreveu)         38           26
-  ter seguro basta                                       16            7
-
-  proibidos sob AMBAS as leituras: 16  (9 reservas distintas)
-```
-
-Duas coisas surgiram de escrever essa regra.
-
-A frase *"somente se o seguro viagem foi comprado **e a condição é
-atendida**"* nunca diz qual condição. Lida de forma estrita, ela proíbe 38
-cancelamentos, 26 dos quais o **gabarito anotado executa**. A subespecificação
-alcança os rótulos de referência, não apenas o agente. O τ³-bench depois
-reescreveu exatamente essa frase, explicitando "o motivo do cancelamento é
-coberto pelo seguro". A formalização caiu justamente sobre a frase que os
-próprios autores foram corrigir, sem que ninguém mandasse olhar ali.
-
-E uma reserva, `XEHM4B` (econômica, sem seguro, feita quatorze dias antes,
-nenhum voo cancelado pela companhia), é cancelada pelo próprio gabarito em uma
-execução pontuada com 1.0. Proibida sob qualquer leitura da frase.
-
-Chegar até aí exigiu três correções, cada uma encontrada lendo casos à mão em
-vez de confiar no número: a primeira contagem cobrava um lote de escritas sob
-um único "yes"; a segunda chamava de violação um upgrade seguido de
-cancelamento, que a política permite expressamente; a terceira modelava a
-cabine com "aconteceu uma vez" quando uma cabine é um atributo que **muda**,
-que é justamente para o que serve o `since_not`.
+Escrever as regras produziu algo mais interessante do que contar violações: as
+duas frases se revelaram **ambíguas de um jeito que alcança os rótulos de
+referência**, e versões posteriores do benchmark reescreveram uma delas. A
+formalização caiu justamente sobre elas sem que ninguém mandasse olhar ali.
 
 Isto não é uma afirmação de que o τ-bench está errado. Sua recompensa é
 documentada e deliberada, e o artigo diz abertamente que `r = 1` "pode ser uma
-condição necessária, mas não suficiente". A afirmação é mais estreita e
-verificável: um compromisso que mandaram o agente cumprir não é medido pela
-coisa que mede o agente, e basta uma linha para medi-lo.
+condição necessária, mas não suficiente". A afirmação é mais estreita: um
+compromisso que mandaram o agente cumprir não é medido pela coisa que mede o
+agente, e basta uma linha para medi-lo.
 
-`tests/test_taubench.py` fixa todos os números acima.
+A auditoria completa, as duas ambiguidades e a que cada número sobreviveu, está
+em [`bench/README.md`](../bench/README.md). `tests/test_taubench.py` fixa todos
+os números.
 
 ## Linguagem
 

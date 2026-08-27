@@ -11,9 +11,9 @@
   <a href="#use-it-from-python">Python API</a> ·
   <a href="#measured-against-a-published-benchmark">Benchmark</a> ·
   <a href="#honest-limits">Limits</a> ·
-  <a href="docs/README.pt-BR.md">Português</a> ·
-  <a href="docs/README.es.md">Español</a> ·
-  <a href="docs/README.zh-CN.md">中文</a>
+  <a href="https://github.com/dev-isaacmello/eleph/blob/main/docs/README.pt-BR.md">Português</a> ·
+  <a href="https://github.com/dev-isaacmello/eleph/blob/main/docs/README.es.md">Español</a> ·
+  <a href="https://github.com/dev-isaacmello/eleph/blob/main/docs/README.zh-CN.md">中文</a>
 </p>
 
 ---
@@ -178,7 +178,7 @@ a thousand events.
 
 ## Use it from Python
 
-A worked example lives in [`examples/langchain-agent`](examples/langchain-agent):
+A worked example lives in [`examples/langchain-agent`](https://github.com/dev-isaacmello/eleph/tree/main/examples/langchain-agent):
 the same LangChain agent run twice over nine cases, once with a guard
 underneath and once without, with identical model, prompt and tools.
 
@@ -222,80 +222,38 @@ event that was never finished being written is an event that did not happen.
 
 ## Measured against a published benchmark
 
-[τ-bench](https://arxiv.org/abs/2406.12045) (ICLR 2025) gives an airline
-customer service agent a written policy. Its first rule:
+[τ-bench](https://arxiv.org/abs/2406.12045) (ICLR 2025) hands an airline
+customer service agent a written policy, says twice that **"the API does not
+check these for the agent"**, and scores runs by hashing the final database. The
+obligation is stated, unenforced, and unmeasured.
 
-> Before taking any actions that update the booking database, you must list the
-> action details and obtain explicit user confirmation (yes) to proceed.
-
-The policy then says, twice, **"The API does not check these for the agent."**
-And the reward hashes the final database, so an unconfirmed write that lands on
-the right state scores exactly like a confirmed one. The obligation is stated,
-unenforced, and unmeasured.
-
-That rule is a `fact`. Replaying the 200 published gpt-4o airline trajectories:
+Two of its rules are written here as `.eleph` facts and replayed over the 200
+published gpt-4o airline trajectories:
 
 ```
-$ python bench/taubench/check.py
+$ python bench/taubench/check.py         # the confirmation rule
+  gasta na acao                 85 escritas sem confirmacao,  8 em execucoes pontuadas como sucesso
+  expira no turno               52 escritas sem confirmacao,  4 em execucoes pontuadas como sucesso
 
-  200 execucoes publicadas, 250 escritas no banco
-  84 pontuadas como SUCESSO (42%, o pass^1 publicado e 0.420)
-
-  leitura                 escritas  execucoes  sucessos com
-                         sem conf.   afetadas      violacao
-  gasta na acao                 85   45 (22%)     8 (10%)
-  expira no turno               52   24 (12%)     4 ( 5%)
+$ python bench/taubench/cancel_check.py  # cancellation eligibility
+  seguro E motivo coberto       38 cancelamentos proibidos, 26 deles no gabarito anotado
+  ter seguro basta              16 cancelamentos proibidos,  7 deles no gabarito anotado
 ```
 
-The sentence does not say whether one "yes" covers one action or a batch, so
-both readings are written down, one `fact` each. They are **not ordered**: 25
-runs only the first flags, 4 only the second, 20 both. A team cannot settle
-this by picking the lenient rule, because there isn't one.
-
-### The rule the API refuses to check
-
-Cancellation eligibility is stronger evidence, because `cancel_reservation`
-validates *nothing at all*. The wiki knows: **"The API does not check these for
-the agent, so the agent must make sure the rules apply before calling the
-API!"**, exclamation mark theirs.
-
-```
-$ python bench/taubench/cancel_check.py
-
-  leitura de 'the condition is met'       proibidos  no gabarito
-  seguro E motivo coberto (como o tau3 escreveu)         38           26
-  ter seguro basta                                       16            7
-
-  proibidos sob AMBAS as leituras: 16  (9 reservas distintas)
-```
-
-Two things came out of writing that rule down.
-
-The sentence *"only if travel insurance is bought **and the condition is
-met**"* never says which condition. Read strictly it forbids 38 cancellations,
-26 of which the **annotated ground truth performs**. The under specification
-reaches the gold labels, not just the agent. τ³-bench later rewrote exactly
-that sentence, spelling out "the reason for cancellation is covered by
-insurance". The formalisation landed on the sentence its authors went on to
-fix, without being told to look there.
-
-And one reservation, `XEHM4B` (economy, no insurance, booked fourteen days
-earlier, no flight cancelled by the airline) is cancelled by the ground truth
-itself in a run scored 1.0. Forbidden however the sentence is read.
-
-Getting there took three corrections, each found by reading cases by hand
-rather than trusting the number: the first count charged a batch of writes
-under one "yes"; the second called an upgrade then cancel a violation, which
-the policy expressly allows; the third modelled cabin with "happened once" when
-a cabin is an attribute that **changes**, which is what `since_not` is for.
+Writing the rules down did something more interesting than counting violations:
+both sentences turned out to be **ambiguous in ways that reach the gold
+labels**, and later versions of the benchmark rewrote one of them. The
+formalisation landed on it without being told where to look.
 
 This is not a claim that τ-bench is wrong. Its reward is documented and
 deliberate, and the paper says outright that `r = 1` "might be a necessary but
-not sufficient condition". The claim is narrower and checkable: a commitment an
-agent was told to keep is not measured by the thing measuring the agent, and it
-takes one line to measure it.
+not sufficient condition". The claim is narrower: a commitment an agent was
+told to keep is not measured by the thing measuring the agent, and it takes one
+line to measure it.
 
-`tests/test_taubench.py` pins every number above.
+The full audit, both ambiguities and what each number survived, is in
+[`bench/README.md`](https://github.com/dev-isaacmello/eleph/blob/main/bench/README.md). `tests/test_taubench.py` pins every
+figure.
 
 ## Language
 
@@ -424,4 +382,4 @@ Stanford, 6 November 1998.
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+MIT. See [LICENSE](https://github.com/dev-isaacmello/eleph/blob/main/LICENSE).
