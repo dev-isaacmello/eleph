@@ -29,7 +29,7 @@ All notable changes to this project are recorded here. The format follows
 * **The repository is a plugin marketplace**, so installing both is two
   commands rather than a clone and a copy:
 
-      /plugin marketplace add dev-isaacmello/eleph
+      /plugin marketplace add dev-isaacmello/eleph      (wait for it)
       /plugin install eleph@eleph
 
   The plugin carries the skill and the MCP server together, which means the

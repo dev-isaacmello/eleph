@@ -75,10 +75,21 @@ uvx --from "eleph[mcp]" eleph-mcp
 
 这个仓库本身就是一个插件市场，所以不用克隆，也不用把文件复制到任何地方：
 
-```bash
+在 Claude Code 里一条一条地运行。先注册这个目录：
+
+```text
 /plugin marketplace add dev-isaacmello/eleph
+```
+
+等到出现 `Successfully added marketplace: eleph`，再安装：
+
+```text
 /plugin install eleph@eleph
 ```
+
+<Callout type="danger" title="是两条命令，不是一行">
+把两行一起粘贴，会让第一条命令把第二条读成自己参数的一部分，Claude Code 会回答 `is not a valid GitHub owner/repo shorthand`。请分开输入。
+</Callout>
 
 这会一次装好**两半**：skill，以及上面那个已经接好的 MCP 服务器。没有任何东西需要粘贴到配置文件里。
 

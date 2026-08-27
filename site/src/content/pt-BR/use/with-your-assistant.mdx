@@ -93,10 +93,23 @@ LangChain](/docs/integration/langchain) apareceu: numa política que estava
 O repositório é um marketplace de plugins, então não tem clonar nem copiar
 arquivo para lugar nenhum:
 
-```bash
+Rode um de cada vez, dentro do Claude Code. Primeiro registre o catálogo:
+
+```text
 /plugin marketplace add dev-isaacmello/eleph
+```
+
+Espere o `Successfully added marketplace: eleph`, e então instale:
+
+```text
 /plugin install eleph@eleph
 ```
+
+<Callout type="danger" title="Dois comandos, não uma linha">
+Colar as duas linhas juntas faz o primeiro comando ler o segundo como parte do
+argumento dele, e o Claude Code responde `is not a valid GitHub owner/repo
+shorthand`. Digite um de cada vez.
+</Callout>
 
 Isso instala as **duas** metades de uma vez: a skill, e o servidor MCP acima já
 ligado. Nada para colar em arquivo de configuração.

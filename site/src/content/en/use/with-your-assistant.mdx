@@ -93,10 +93,23 @@ before and after the fix.
 The repository is a plugin marketplace, so there is no cloning and no copying
 files into place:
 
-```bash
+Run them one at a time, inside Claude Code. First register the catalogue:
+
+```text
 /plugin marketplace add dev-isaacmello/eleph
+```
+
+Wait for `Successfully added marketplace: eleph`, then install:
+
+```text
 /plugin install eleph@eleph
 ```
+
+<Callout type="danger" title="Two commands, not one line">
+Pasting both lines together makes the first one read the second as part of its
+argument, and Claude Code answers `is not a valid GitHub owner/repo shorthand`.
+Enter them separately.
+</Callout>
 
 That installs **both** halves at once: the skill, and the MCP server above
 already wired up. Nothing to paste into a config file.
