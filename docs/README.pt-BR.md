@@ -164,16 +164,17 @@ que esse evento nomeia.
 $ python bench/scaling.py
 
 interacoes      log   relendo   indice   ganho     ev/s  escala
-       500     1096      1.44    0.040     36x    27272       -
-      1000     2196      5.94    0.095     63x    23170   x2.36
+       500     1134      1.62    0.058     28x    19482       -
+      1000     2274      6.15    0.109     56x    20867   x1.87
+                       (x3.8)
+      2000     4554     24.97    0.208    120x    21890   x1.91
                        (x4.1)
-      2000     4396     24.87    0.212    117x    20755   x2.23
-                       (x4.2)
-      8000    17566         -    0.746      -    23548   x1.97
+      4000     9100         -    0.381      -    23912   x1.83
+      8000    18192         -    0.830      -    21909   x2.18
 ```
 
 O tempo dobra quando o trabalho dobra, enquanto reler o log quadruplicava.
-Medido em 140,546 eventos em 5.7 s com throughput constante.
+Medido em 145,564 eventos em 6.1 s com throughput constante.
 
 Cada célula do índice é uma função pura do log, a mesma função que o avaliador
 ingênuo computa relendo-o. Isso é uma otimização de uma afirmação de verdade,

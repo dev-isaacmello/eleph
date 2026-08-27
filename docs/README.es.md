@@ -165,16 +165,17 @@ las claves que ese evento nombra.
 $ python bench/scaling.py
 
 interacoes      log   relendo   indice   ganho     ev/s  escala
-       500     1096      1.44    0.040     36x    27272       -
-      1000     2196      5.94    0.095     63x    23170   x2.36
+       500     1134      1.62    0.058     28x    19482       -
+      1000     2274      6.15    0.109     56x    20867   x1.87
+                       (x3.8)
+      2000     4554     24.97    0.208    120x    21890   x1.91
                        (x4.1)
-      2000     4396     24.87    0.212    117x    20755   x2.23
-                       (x4.2)
-      8000    17566         -    0.746      -    23548   x1.97
+      4000     9100         -    0.381      -    23912   x1.83
+      8000    18192         -    0.830      -    21909   x2.18
 ```
 
 El tiempo se duplica cuando el trabajo se duplica, mientras que releer el log lo
-cuadruplicaba. Medido en 140,546 eventos en 5.7 s con throughput plano.
+cuadruplicaba. Medido en 145,564 eventos en 6.1 s con throughput plano.
 
 Cada celda del índice es una función pura del log, la misma función que el
 evaluador ingenuo calcula releyéndolo. Eso es una optimización de una afirmación
