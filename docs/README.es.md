@@ -184,9 +184,9 @@ aleatorios e historiales de más de mil eventos.
 
 ## Úsalo desde Python
 
-Un ejemplo completo esta en [`examples/langchain-agent`](../examples/langchain-agent):
-el mismo agente LangChain ejecutado dos veces sobre cinco casos, una con un
-guard debajo y otra sin el, con modelo, prompt y herramientas identicos.
+Un ejemplo trabajado está en [`examples/langchain-agent`](../examples/langchain-agent):
+el mismo agente LangChain ejecutado dos veces sobre nueve casos, una con un
+guard debajo y otra sin él, con modelo, prompt y herramientas idénticos.
 
 El lenguaje es el artefacto de investigación. Lo que la mayoría de los sistemas
 necesita es más pequeño, y se distribuye como biblioteca:
@@ -208,8 +208,8 @@ g.promise("alice", "has_seat", "alice", "ba117",
 g.outstanding()        # what is still owed, to whom
 ```
 
-Tres formas de integración, de la más barata en adelante.
-`python examples/agente.py` ejecuta las tres.
+Tres formas, de la más barata en adelante. `python examples/agente.py` ejecuta
+las tres.
 
 | forma | qué cambias | qué obtienes |
 |---|---|---|
@@ -328,14 +328,31 @@ on request(C, make_reservation(P, F)):  ...
 | `exists P: Sort where φ` | algún objeto satisface φ ahora |
 | `count P: Sort where φ >= n` | cuántos lo hacen, que es lo que necesita un límite de asientos |
 | `spoke accept to C about e(...)` | el programa realizó ese acto en ese intercambio |
+| `e(a, amount > 100)` | un campo numérico del evento, evaluado en el momento en que ocurre |
 | `not`, `and`, `or` | como es habitual |
+
+Un handler puede condicionarse a la autoridad, que es el octavo acto de habla de
+McCarthy y aquel por el que una revisión ordinaria nunca pregunta:
+
+```
+on question(Quem, saldo(C)) permitted pode_perguntar(Quem, C):
+    answer Quem with saldo(C)
+```
+
+Un agente de soporte que informa con toda veracidad el saldo de cualquier
+cliente a quien se lo pida no ha dicho mentira alguna, y todas las demás
+obligaciones de aquí lo aprobarían. El permiso se suma a la condición de camino,
+de modo que las respuestas se prueban *bajo* él en lugar de comprobarse aparte,
+y el runtime falla cerrado: una respuesta retenida es recuperable, una respuesta
+filtrada no.
 
 El `e(a, b)` desnudo, con el sentido de *ocurrió alguna vez*, es la trampa, y lo
 es a propósito: se lee como "tiene" y significa "hizo". El verificador es lo que
 distingue una cosa de la otra.
 
 Sentencias: `answer C yes` / `answer C no` / `answer C with φ`, `record e(...)`,
-`accept C`, `decline C`, `release C from φ`, y tres intensidades de compromiso:
+`accept C`, `decline C`, `release C from φ`, y cuatro intensidades de
+compromiso: `offer C that φ` (dispuesto, aún sin deber nada),
 `promise C that φ` (verdadera al decirse), `promise C eventually φ` y
 `promise C that φ before e(...)`.
 
@@ -347,7 +364,9 @@ Sentencias: `answer C yes` / `answer C no` / `answer C with φ`, `record e(...)`
 | la respuesta responde a la pregunta formulada | Z3 |
 | la promesa inmediata se sostiene al hacerse | Z3, sobre el log más lo que el handler acaba de registrar |
 | la promesa futura es una que algún camino puede producir | Z3, exigiendo que el camino la haga pasar de falsa a verdadera |
-| los sorts de los argumentos concuerdan con las declaraciones | compilador |
+| los sorts de los argumentos concuerdan con las declaraciones | compilador, en cada fact, se use o no |
+| la oferta es una que algún camino podría honrar | Z3 |
+| ninguna puerta hacia un asunto protegido queda sin llave | estructural |
 | todo camino responde exactamente una vez | estructural |
 | toda solicitud se acepta o se rechaza exactamente una vez | estructural |
 | compromisos pendientes e incumplidos | libro mayor en runtime |
@@ -360,9 +379,10 @@ Sentencias: `answer C yes` / `answer C no` / `answer C with φ`, `record e(...)`
   `bench/taubench/cancel.eleph`, es que el host emita el plazo como un evento.
   El reloj vive fuera de la lógica, que es como los sistemas event sourced
   manejan el tiempo de todos modos.
-* **Los eventos llevan identidades, no datos.** Nada de `price > 100`. Pon la
-  clasificación en la identidad del evento: es tosco, pero funciona para reglas
-  a nivel de política.
+* **Los campos numéricos se comparan en el instante en que ocurre el evento.**
+  Eso es lo que mantiene intacto el argumento de completitud, y es también el
+  límite: puedes preguntar si *este cargo* superó 100, no si la suma de los tres
+  últimos lo hizo. La aritmética agregada sobre el historial no es expresable.
 * **El umbral lineal de completitud cubre un fragmento.** Vale cuando cada
   `since_not` toma átomos. Fuera de ahí, la completitud viene del espacio de
   estados del monitor, y más allá el verificador admite que la ejecución no fue
@@ -377,6 +397,9 @@ Sentencias: `answer C yes` / `answer C no` / `answer C with φ`, `record e(...)`
   `Machine.index.usable` lo indica.
 * **`spoke` nombra el intercambio, no el contenido.** "¿Ya prometí exactamente
   esto?" no es expresable. "¿Ya prometí algo aquí?" sí lo es.
+* **El permiso es un hecho, no un sistema de roles.** `permitted` condiciona un
+  handler a algo que el log sostiene, lo que cubre "este interlocutor se
+  autentico en esta cuenta". No hay roles, jerarquia ni delegacion.
 * **Los hechos no pueden ser recursivos**, así que las propiedades transitivas
   quedan fuera de alcance.
 * **La auditoría de τ-bench lee lenguaje natural con una regex.** El
@@ -412,7 +435,7 @@ eleph talk        examples/companhia.eleph examples/conversa.txt --roster alice,
 python examples/agente.py            # the three integration shapes
 python bench/scaling.py              # constant time per event
 python bench/taubench/check.py       # the benchmark audit
-pytest -q                            # 121 tests
+pytest -q                            # 146 tests
 ```
 
 ## Fuente

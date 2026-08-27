@@ -4,6 +4,33 @@ All notable changes to this project are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [semantic versioning](https://semver.org/).
 
+## [0.3.0]
+
+### Added
+
+* **Numeric fields**, compared at the instant the event happens:
+  `charged(U, amount > 100)`. The comparison is part of the atom's identity
+  rather than a separate fact that could move underneath it, so the
+  completeness argument survives and numeric programs are still decided
+  exhaustively.
+* **Permission**, McCarthy's eighth speech act:
+  `on question(Q, saldo(U)) permitted autorizado(Q, U):`. Not whether an answer
+  is true, but whether this party was entitled to ask. The permission joins the
+  path condition so answers are proved under it, and the runtime fails closed.
+* **Offers**: `offer C that φ`, the weakest commitment. Not a debt, because
+  nobody has taken it up; what it owes is that some path could honour it.
+* **A structural check for unguarded doors.** One handler requiring permission
+  and its neighbour requiring none is a locked front door beside an open
+  window, and is now reported as a defect.
+* **A worked LangChain example** (`examples/langchain-agent`): the same agent
+  run with and without a guard, over nine scenarios, against Claude through
+  either an API key or the Agent SDK over OAuth.
+
+### Fixed
+
+* Every declared fact is type checked whether anything calls it or not.
+  Resolution is lazy, so a fact no handler mentioned was never checked at all.
+
 ## [0.2.0]
 
 First public release.

@@ -18,4 +18,4 @@ from .store import Store
 __all__ = ["Policy", "Guard", "VerifyReport", "Ungrounded", "UnknownName",
            "Commitment", "Event", "Machine", "NotPermitted", "Refusal",
            "Store"]
-__version__ = "0.2.0"
+__version__ = "0.3.0"

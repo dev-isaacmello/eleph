@@ -183,9 +183,9 @@ históricos com mais de mil eventos.
 
 ## Use a partir do Python
 
-Um exemplo completo esta em [`examples/langchain-agent`](../examples/langchain-agent):
-o mesmo agente LangChain rodado duas vezes sobre cinco casos, uma com guarda
-embaixo e outra sem, com modelo, prompt e ferramentas identicos.
+Um exemplo completo está em [`examples/langchain-agent`](../examples/langchain-agent):
+o mesmo agente LangChain rodado duas vezes sobre nove casos, uma com um guard
+por baixo e outra sem, com modelo, prompt e ferramentas idênticos.
 
 A linguagem é o artefato de pesquisa. O que a maioria dos sistemas precisa é
 menor, e isso vem como biblioteca:
@@ -325,16 +325,32 @@ on request(C, make_reservation(P, F)):  ...
 | `exists P: Sort where φ` | algum objeto satisfaz φ agora |
 | `count P: Sort where φ >= n` | quantos satisfazem, que é o que um limite de assentos precisa |
 | `spoke accept to C about e(...)` | o programa executou aquele ato naquele diálogo |
+| `e(a, amount > 100)` | um campo numérico do evento, testado no instante em que ele acontece |
 | `not`, `and`, `or` | como de costume |
+
+Um handler pode ser condicionado à autoridade, que é o oitavo ato de fala de
+McCarthy e aquele sobre o qual uma revisão comum nunca pergunta:
+
+```
+on question(Quem, saldo(C)) permitted pode_perguntar(Quem, C):
+    answer Quem with saldo(C)
+```
+
+Um agente de atendimento que informa com veracidade o saldo de qualquer cliente
+a quem quer que pergunte não contou mentira alguma, e todas as outras
+obrigações daqui o aprovariam. A permissão entra na condição de caminho, então
+as respostas são provadas *sob* ela em vez de conferidas à parte, e o runtime
+falha fechado: uma resposta retida é recuperável, uma resposta vazada não é.
 
 O `e(a, b)` puro, significando *alguma vez aconteceu*, é a armadilha, de
 propósito: ele se lê como "tem" e significa "fez". O verificador é o que
 distingue os dois.
 
 Comandos: `answer C yes` / `answer C no` / `answer C with φ`, `record e(...)`,
-`accept C`, `decline C`, `release C from φ`, e três intensidades de
-compromisso: `promise C that φ` (verdadeiro quando dito),
-`promise C eventually φ` e `promise C that φ before e(...)`.
+`accept C`, `decline C`, `release C from φ`, e quatro intensidades de
+compromisso: `offer C that φ` (disposto, ainda sem dever),
+`promise C that φ` (verdadeiro quando dito), `promise C eventually φ` e
+`promise C that φ before e(...)`.
 
 ## Obrigações derivadas
 
@@ -344,7 +360,9 @@ compromisso: `promise C that φ` (verdadeiro quando dito),
 | a resposta responde à pergunta feita | Z3 |
 | a promessa imediata vale no momento em que é feita | Z3, sobre o log mais o que o handler acabou de registrar |
 | a promessa futura é alcançável por algum caminho | Z3, exigindo que o caminho a leve de falsa a verdadeira |
-| os sorts dos argumentos batem com as declarações | compilador |
+| os sorts dos argumentos batem com as declarações | compilador, em todo fato, usado ou não |
+| uma oferta é uma que algum caminho poderia honrar | Z3 |
+| nenhuma porta para um assunto protegido fica destrancada | estrutural |
 | todo caminho responde exatamente uma vez | estrutural |
 | toda requisição é aceita ou recusada exatamente uma vez | estrutural |
 | compromissos pendentes e quebrados | ledger em runtime |
@@ -356,9 +374,10 @@ compromisso: `promise C that φ` (verdadeiro quando dito),
   que funciona hoje, e o que `bench/taubench/cancel.eleph` usa, é o host emitir
   o prazo como um evento. O relógio vive fora da lógica, que é como sistemas
   event sourced tratam o tempo de qualquer maneira.
-* **Eventos carregam identidades, não dados.** Nada de `price > 100`. Coloque a
-  classificação na identidade do evento, o que é grosseiro mas funciona para
-  regras em nível de política.
+* **Campos numéricos são comparados no instante em que o evento acontece.** É
+  isso que mantém o argumento de completude intacto, e é também o limite: você
+  pode perguntar se *esta cobrança* passou de 100, não se a soma das três
+  últimas passou. Aritmética agregada sobre o histórico não é expressável.
 * **O limiar linear de completude cobre um fragmento.** Ele vale quando todo
   `since_not` recebe átomos. Fora dele, a completude vem do espaço de estados
   do monitor, e além disso o checker admite que a execução não foi exaustiva. O
@@ -374,6 +393,9 @@ compromisso: `promise C that φ` (verdadeiro quando dito),
   `Machine.index.usable` avisa quando é o caso.
 * **`spoke` nomeia o diálogo, não o conteúdo.** "Eu já prometi exatamente
   isto?" não é expressável. "Eu já prometi alguma coisa aqui?" é.
+* **Permissao e um fato, nao um sistema de papeis.** `permitted` condiciona um
+  handler a algo que o log sustenta, o que cobre "este interlocutor se
+  autenticou nesta conta". Nao ha papeis, hierarquia nem delegacao.
 * **Fatos não podem ser recursivos**, então propriedades transitivas estão fora
   de alcance.
 * **A auditoria do τ-bench lê linguagem natural com uma regex.** O assentimento
@@ -409,7 +431,7 @@ eleph talk        examples/companhia.eleph examples/conversa.txt --roster alice,
 python examples/agente.py            # the three integration shapes
 python bench/scaling.py              # constant time per event
 python bench/taubench/check.py       # the benchmark audit
-pytest -q                            # 121 tests
+pytest -q                            # 146 tests
 ```
 
 ## Fonte

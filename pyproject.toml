@@ -1,6 +1,6 @@
 [project]
 name = "eleph"
-version = "0.2.0"
+version = "0.3.0"
 description = "A language whose programs cannot lie: speech acts, a history that is the only state, and correctness conditions derived from the program text rather than written beside it."
 readme = "README.md"
 requires-python = ">=3.11"

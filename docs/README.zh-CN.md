@@ -164,7 +164,7 @@ interacoes      log   relendo   indice   ganho     ev/s  escala
 ## 在 Python 中使用
 
 完整示例位于 [`examples/langchain-agent`](../examples/langchain-agent)：同一个
-LangChain 智能体在五个场景上运行两次，一次底层有 guard，一次没有，模型、提示词
+LangChain 智能体在九个场景上运行两次，一次底层有 guard，一次没有，模型、提示词
 和工具完全相同。
 
 这门语言是研究成果本身。大多数系统需要的东西更小，而它以库的形式提供：
@@ -288,15 +288,29 @@ on request(C, make_reservation(P, F)):  ...
 | `exists P: Sort where φ` | 当前存在某个对象满足 φ |
 | `count P: Sort where φ >= n` | 有多少个对象满足，这正是座位上限所需要的 |
 | `spoke accept to C about e(...)` | 程序在那次交互中执行过该行为 |
+| `e(a, amount > 100)` | 事件的一个数值字段，在它发生的当下被检验 |
 | `not`、`and`、`or` | 一如通常 |
+
+处理器可以以权限为前提来设卡，这是 McCarthy 的第八种言语行为，也是普通评审从来不会
+去追问的那一种：
+
+```
+on question(Quem, saldo(C)) permitted pode_perguntar(Quem, C):
+    answer Quem with saldo(C)
+```
+
+一个客服智能体，只要谁来问就如实报出任何客户的余额，它一句谎话都没说，而这里其他
+所有义务都会放它过关。权限会并入路径条件，因此回答是*在权限之下*被证明的，而不是
+在旁边被单独打勾，并且运行时是失败即关闭的：被扣下的回答还能补救，泄露出去的回答
+不能。
 
 裸写的 `e(a, b)` 表示*曾经发生过*，这个陷阱是故意留的：它读起来像「持有」，实际意思却是
 「办理过」。能把两者分辨开的，正是验证器。
 
 语句：`answer C yes` / `answer C no` / `answer C with φ`、`record e(...)`、
-`accept C`、`decline C`、`release C from φ`，以及三种强度的承诺：
-`promise C that φ`（说出时即为真）、`promise C eventually φ`，
-以及 `promise C that φ before e(...)`。
+`accept C`、`decline C`、`release C from φ`，以及四种强度的承诺：
+`offer C that φ`（有意愿，尚未负债）、`promise C that φ`（说出时即为真）、
+`promise C eventually φ`，以及 `promise C that φ before e(...)`。
 
 ## 推导出的义务
 
@@ -306,7 +320,9 @@ on request(C, make_reservation(P, F)):  ...
 | 回答确实回应了所提的问题 | Z3 |
 | 即时承诺在说出时成立 | Z3，基于日志加上处理器刚刚记录的内容 |
 | 未来承诺是某条路径能够促成的 | Z3，要求该路径把它从假变为真 |
-| 参数的 sort 与声明一致 | 编译器 |
+| 参数的 sort 与声明一致 | 编译器，对每个 fact，无论是否被用到 |
+| 提议是某条路径能够兑现的 | Z3 |
+| 通往受保护主题的门没有一扇是未上锁的 | 结构性检查 |
 | 每条路径恰好回答一次 | 结构性检查 |
 | 每个请求恰好被接受或拒绝一次 | 结构性检查 |
 | 未结清与已违背的承诺 | 运行时账本 |
@@ -317,8 +333,9 @@ on request(C, make_reservation(P, F)):  ...
   无法直接表达。今天可行的模式，也是 `bench/taubench/cancel.eleph` 采用的模式，是让
   宿主把截止时刻作为一个事件发出。时钟活在逻辑之外，反正事件溯源系统本来就是这样
   处理时间的。
-* **事件携带的是标识，不是数据。** 没有 `price > 100`。把分类放进事件标识里，这虽然
-  粗糙，但对策略层面的规则是够用的。
+* **数值字段是在事件发生的那一瞬间被比较的。** 正是这一点让完备性论证保持完整，同时
+  它也是限制所在：你可以问*这一笔扣款*是否超过 100，但不能问最近三笔的总和是否超过。
+  对历史做聚合运算是无法表达的。
 * **线性完备性阈值只覆盖一个片段。** 它在每个 `since_not` 都只接受原子时成立。超出这个
   范围，完备性来自监视器的状态空间；再超出去，检查器就会承认这次运行不是穷尽的。
   阈值还会随常量增长：要证明关于 180 这个容量的性质，就需要能容纳 180 个事件的历史。
@@ -329,6 +346,8 @@ on request(C, make_reservation(P, F)):  ...
   说明这一点。
 * **`spoke` 指名的是交互，不是内容。** 「我是否已经承诺过这件一模一样的事？」无法表达。
   「我在这里是否已经承诺过什么？」可以。
+* **权限是一个事实，不是角色系统。** `permitted` 让一个 handler 取决于日志能够支持的
+  东西，也就是"这个调用方是否已在该账户上完成认证"。没有角色，没有层级，也没有委派。
 * **fact 不能递归**，因此传递性性质是够不着的。
 * **τ-bench 审计是用正则表达式读自然语言的。** 同意是从一份宽松的词表中匹配的，所以
   计数是少报而不是多报。样本违规在数字发表之前都经过了人工阅读。
@@ -360,7 +379,7 @@ eleph talk        examples/companhia.eleph examples/conversa.txt --roster alice,
 python examples/agente.py            # the three integration shapes
 python bench/scaling.py              # constant time per event
 python bench/taubench/check.py       # the benchmark audit
-pytest -q                            # 121 tests
+pytest -q                            # 146 tests
 ```
 
 ## 来源

@@ -178,7 +178,7 @@ a thousand events.
 ## Use it from Python
 
 A worked example lives in [`examples/langchain-agent`](examples/langchain-agent):
-the same LangChain agent run twice over five cases, once with a guard
+the same LangChain agent run twice over nine cases, once with a guard
 underneath and once without, with identical model, prompt and tools.
 
 The language is the research artifact. What most systems need is smaller, and
@@ -378,6 +378,9 @@ Statements: `answer C yes` / `answer C no` / `answer C with φ`, `record e(...)`
   run, by rereading the log, and `Machine.index.usable` says so.
 * **`spoke` names the exchange, not the content.** "Did I already promise this
   exact thing?" is not expressible. "Did I already promise something here?" is.
+* **Permission is a fact, not a role system.** `permitted` gates a handler on
+  something the log supports, which covers "is this caller authenticated for
+  this account". There are no roles, no hierarchy and no delegation.
 * **Facts cannot be recursive**, so transitive properties are out of reach.
 * **The τ-bench audit reads natural language with a regex.** Assent is matched
   from a generous word list, so counts under report rather than over report.
@@ -410,7 +413,7 @@ eleph talk        examples/companhia.eleph examples/conversa.txt --roster alice,
 python examples/agente.py            # the three integration shapes
 python bench/scaling.py              # constant time per event
 python bench/taubench/check.py       # the benchmark audit
-pytest -q                            # 121 tests
+pytest -q                            # 146 tests
 ```
 
 ## Source
