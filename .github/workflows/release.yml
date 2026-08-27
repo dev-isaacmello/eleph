@@ -17,6 +17,12 @@ jobs:
   release:
     runs-on: ubuntu-latest
     environment: pypi          # add required reviewers here to gate uploads
+    # The default token is read only, so `gh release create` gets a 403. The
+    # dry run never caught it: that step only runs on a tag, and a dry run is a
+    # workflow_dispatch. It cost the 0.4.0 release its GitHub entry, after the
+    # upload to PyPI had already succeeded.
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
 
