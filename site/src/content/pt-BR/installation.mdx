@@ -70,14 +70,16 @@ $ command -v eleph
 
 ## Extras opcionais
 
-Existem dois extras, e nenhum é necessário para a linguagem ou o verificador.
+Existem três extras, e nenhum é necessário para a linguagem ou o verificador.
 
 | Extra | Adiciona | Necessário para |
 |---|---|---|
+| `mcp` | `mcp >= 2.0` | o servidor MCP, `eleph-mcp`. Veja [com seu assistente de código](/docs/use/with-your-assistant) |
 | `claude` | `anthropic >= 0.40` | o front end de linguagem natural usado por `eleph talk --claude` |
 | `langchain` | `langchain`, `langchain-anthropic`, `langgraph` (todos `>= 1.0`) | a comparação de agentes em `examples/langchain-agent` |
 
 ```bash
+uv pip install "eleph[mcp]"
 uv pip install "eleph[claude]"
 uv pip install "eleph[langchain]"
 ```

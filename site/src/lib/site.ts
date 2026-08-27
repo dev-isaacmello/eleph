@@ -4,7 +4,8 @@ export const site = {
   tagline: 'A language whose programs cannot lie.',
   description:
     'Speech acts, a history that is the only state, and correctness conditions derived from the program text rather than written beside it.',
-  version: '0.3.0',
+  /** Read from pyproject.toml at build time; never written down here. */
+  version: __ELEPH_VERSION__,
   author: 'Isaac Mello',
   repo: 'https://github.com/dev-isaacmello/eleph',
   issues: 'https://github.com/dev-isaacmello/eleph/issues',

@@ -68,14 +68,16 @@ $ command -v eleph
 
 ## 可选的额外依赖
 
-有两组额外依赖，语言本身和验证器都不需要它们。
+有三组额外依赖，语言本身和验证器都不需要它们。
 
 | 额外依赖 | 增加 | 用于 |
 |---|---|---|
+| `mcp` | `mcp >= 2.0` | MCP 服务器 `eleph-mcp`。见[配合你的编程助手](/docs/use/with-your-assistant) |
 | `claude` | `anthropic >= 0.40` | `eleph talk --claude` 所用的自然语言前端 |
 | `langchain` | `langchain`、`langchain-anthropic`、`langgraph`（都 `>= 1.0`） | `examples/langchain-agent` 里的智能体对照实验 |
 
 ```bash
+uv pip install "eleph[mcp]"
 uv pip install "eleph[claude]"
 uv pip install "eleph[langchain]"
 ```

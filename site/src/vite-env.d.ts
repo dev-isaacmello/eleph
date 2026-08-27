@@ -1,3 +1,5 @@
+declare const __ELEPH_VERSION__: string
+
 /// <reference types="vite/client" />
 
 declare module '*.mdx' {

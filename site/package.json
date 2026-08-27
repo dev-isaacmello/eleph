@@ -1,9 +1,9 @@
 {
   "name": "eleph-docs",
   "private": true,
-  "version": "0.3.0",
+  "version": "1.6.0",
   "type": "module",
-  "description": "Official documentation site for eleph, a language whose programs cannot lie.",
+  "description": "Official documentation site for eleph. Its displayed version comes from pyproject.toml, not from here.",
   "scripts": {
     "index": "node scripts/build-search-index.mjs",
     "dev": "npm run index && vite",

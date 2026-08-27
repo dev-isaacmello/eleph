@@ -12,6 +12,37 @@ semântico</a>. A cópia canônica é o <a
 href="https://github.com/dev-isaacmello/eleph/blob/main/CHANGELOG.md">CHANGELOG.md</a>.
 </p>
 
+## 0.4.0
+
+### Adicionado
+
+* **Um servidor MCP** (`eleph-mcp`, atrás do extra `mcp`). Quatro ferramentas,
+  todas sem estado e nenhuma tocando disco ou rede: `eleph_check` descarrega
+  toda obrigação e devolve o histórico que quebra a regra; `eleph_obligations`
+  imprime as condições sem descarregar; `eleph_simulate` reexecuta uma sequência
+  de eventos por uma guarda e reporta o que ela recusa; `eleph_declarations`
+  lista o que uma política declara, com cada fato expandido na fórmula que ele
+  representa.
+
+  Ele serve o verificador em vez da documentação, de propósito. Um servidor que
+  só recitasse a doc deixaria um modelo escrever uma política de memória e
+  entregá-la sem verificação, que é a falha que este projeto existe para impedir.
+
+* **Uma skill** para o assistente de código de quem usa o eleph. Ela carrega o
+  laço escrever-checar-corrigir e os limites que significam que uma regra não é
+  expressável, para o modelo parar em vez de aproximar.
+
+* **O repositório é um marketplace de plugins**, então instalar os dois são dois
+  comandos em vez de um clone e uma cópia. Veja [com seu assistente de
+  código](/docs/use/with-your-assistant).
+
+### Corrigido
+
+* Trinta e três declarações de fato nesta documentação estavam quebradas em
+  linhas, o que não parseia: o corpo de um fato não pode atravessar linhas, e a
+  página de gramática dizia o contrário nos três idiomas. Um passo de CI agora
+  entrega todo programa impresso neste site ao `eleph check`.
+
 ## 0.3.0
 
 ### Adicionado

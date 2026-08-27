@@ -12,6 +12,7 @@ import { fileURLToPath } from 'node:url'
 import { elephGrammar, elephOutputGrammar } from './src/lib/eleph-grammar'
 import { resolveOrigin } from './scripts/origin.mjs'
 import remarkCjkLineBreaks from './scripts/remark-cjk-linebreaks.mjs'
+import { packageVersion } from './scripts/version.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const origin = resolveOrigin()
@@ -31,6 +32,9 @@ const stampOrigin = {
 }
 
 export default defineConfig({
+  define: {
+    __ELEPH_VERSION__: JSON.stringify(packageVersion()),
+  },
   resolve: {
     alias: { '@': path.resolve(here, 'src') },
   },
