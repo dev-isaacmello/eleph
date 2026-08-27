@@ -26,16 +26,19 @@ OK, BAD, DIM, WARN, OFF = "\033[32m", "\033[31m", "\033[2m", "\033[33m", "\033[0
 def once(scenario, guarded, policy, model, via_sdk=False):
     """One conversation, from a clean backend."""
     backend = scenario.setup()
-    guard = seed(policy.guard(), backend) if guarded else None
+    guard = (seed(policy.guard(), backend, scenario.session)
+             if guarded else None)
 
     try:
         if via_sdk:
             from agent import SYSTEM
             from sdk_agent import ask
-            result = ask(backend, guard, SYSTEM, scenario.message, model)
+            result = ask(backend, guard, SYSTEM, scenario.message, model,
+                         caller=scenario.caller)
             reply, refusals = result["reply"], result["refusals"]
         else:
-            messages = run(build(backend, guard, model), scenario.message)
+            messages = run(build(backend, guard, model, scenario.caller),
+                           scenario.message)
             refusals = sum(1 for m in messages
                            if getattr(m, "type", "") == "tool"
                            and "RECUSADO" in str(m.content))

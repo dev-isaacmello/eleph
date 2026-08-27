@@ -39,7 +39,7 @@ def test_the_guard_changes_the_outcome(pieces):
     plain = sum(once(s, False, policy, None)["ok"] for s in scenarios)
     guarded = sum(once(s, True, policy, None)["ok"] for s in scenarios)
     assert plain == 2
-    assert guarded == len(scenarios) == 7
+    assert guarded == len(scenarios) == 9
 
 
 def test_the_guard_never_makes_a_correct_run_incorrect(pieces):
@@ -54,7 +54,31 @@ def test_the_guard_never_makes_a_correct_run_incorrect(pieces):
 def test_refusals_are_what_produce_the_difference(pieces):
     policy, scenarios, once = pieces
     refused = sum(once(s, True, policy, None)["refusals"] for s in scenarios)
-    assert refused == 5
+    assert refused == 7
+
+
+def test_answering_truthfully_can_still_be_the_bug(pieces):
+    """The case worth the whole suite.
+
+    Somebody authenticated for their own account asks about a stranger's. The
+    agent asserts nothing the record does not support and keeps every promise
+    it makes, and it leaks a customer's account. Every obligation in this
+    language passes that run except permission, and permission only catches it
+    because somebody wrote it down.
+    """
+    policy, scenarios, once = pieces
+    leak = next(s for s in scenarios if s.name == "conta de outra pessoa")
+    assert not once(leak, False, policy, None)["ok"]
+    assert once(leak, True, policy, None)["ok"]
+
+
+def test_disclosure_counts_as_an_operation(pieces):
+    """A leak leaves no trace in the data. Scoring only writes would call it a
+    clean run, which is how leaks ship."""
+    from backend import Account, Backend
+    b = Backend().add(Account("x", True, []))
+    b.lookup("x")
+    assert ("lookup", "x") in b.operations
 
 
 def test_a_refund_becomes_a_tracked_debt(pieces):

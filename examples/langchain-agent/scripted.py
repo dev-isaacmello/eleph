@@ -20,7 +20,10 @@ from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import AIMessage, BaseMessage
 from langchain_core.outputs import ChatGeneration, ChatResult
 
-USER = re.compile(r"\b(?:cliente|usuario|conta)[: ]+([a-z_]+)", re.I)
+# The account under discussion is named in the message. Who is on the line is
+# not, and never is: that comes from the session, so the model is never asked
+# and cannot answer wrongly.
+USER = re.compile(r"\bconta\s+([a-z_]+)", re.I)
 CHARGE = re.compile(r"\b(c\d+)\b", re.I)
 WANTS_REFUND = re.compile(r"quero o? ?reembolso|estorn|devolv", re.I)
 # A request, not a claim about the past: "quero cancelar" is an instruction,

@@ -57,7 +57,7 @@ def _text(body: str) -> dict:
     return {"content": [{"type": "text", "text": body}]}
 
 
-def make_server(backend, guard=None, refusals=None):
+def make_server(backend, guard=None, refusals=None, caller=None):
     """The same three tools, and the same one difference.
 
     `refusals` is a list the tools append to when the guard turns an operation
@@ -66,16 +66,33 @@ def make_server(backend, guard=None, refusals=None):
     """
     refusals = refusals if refusals is not None else []
 
+    def blocked(user):
+        """Whether this caller may speak about this account at all. The caller
+        comes from the session, never from the conversation: the model is not
+        asked who it is speaking for, so it cannot answer wrongly."""
+        if guard is None:
+            return None
+        try:
+            guard.require("autorizado", caller, user)
+        except Ungrounded:
+            refusals.append("autorizado")
+            return _text(f"RECUSADO pela politica: quem esta na linha nao se "
+                         f"autenticou na conta de {user}. Nao confirme nem "
+                         f"negue nada sobre essa conta.")
+        return None
+
     @tool("consultar_conta",
           "Consulta a conta de um cliente: se esta ativa e quais cobrancas tem.",
           {"user": str})
     async def consultar_conta(args):
-        return _text(str(backend.lookup(args["user"])))
+        return blocked(args["user"]) or _text(str(backend.lookup(args["user"])))
 
     @tool("cancelar_assinatura", "Cancela a assinatura de um cliente.",
           {"user": str})
     async def cancelar_assinatura(args):
         user = args["user"]
+        if (stop := blocked(user)) is not None:
+            return stop
         if guard is not None:
             try:
                 guard.require("active", user)
@@ -89,21 +106,35 @@ def make_server(backend, guard=None, refusals=None):
             guard.record("cancelled", user)
         return _text(out)
 
+    @tool("encaminhar_para_supervisao",
+          "Encaminha uma cobranca acima da sua alcada para a supervisao.",
+          {"user": str, "charge_id": str})
+    async def encaminhar_para_supervisao(args):
+        user, charge_id = args["user"], args["charge_id"]
+        if (stop := blocked(user)) is not None:
+            return stop
+        out = backend.escalate(user, charge_id)
+        if guard is not None:
+            guard.record("escalated", user, charge_id)
+        return _text(out)
+
     @tool("emitir_reembolso",
           "Emite o reembolso de uma cobranca especifica de um cliente.",
           {"user": str, "charge_id": str})
     async def emitir_reembolso(args):
         user, charge_id = args["user"], args["charge_id"]
+        if (stop := blocked(user)) is not None:
+            return stop
         if guard is not None:
             try:
-                guard.require("refundable", user, charge_id)
+                guard.require("may_refund", user, charge_id)
             except Ungrounded:
                 refusals.append("emitir_reembolso")
                 return _text(
                     f"RECUSADO pela politica: a cobranca {charge_id} de "
-                    f"{user} nao e reembolsavel. Reembolso so vale para "
-                    "cobranca em aberto de cliente que ja cancelou. Consulte "
-                    "a conta e explique ao cliente.")
+                    f"{user} nao pode ser reembolsada por voce. Vale para "
+                    "cobranca em aberto de cliente que ja cancelou, ate "
+                    "R$ 200. Acima disso, encaminhe para a supervisao.")
         out = backend.refund(user, charge_id)
         if guard is not None:
             guard.record("refunded", user, charge_id)
@@ -113,12 +144,13 @@ def make_server(backend, guard=None, refusals=None):
 
     return create_sdk_mcp_server(
         name=SERVER, tools=[consultar_conta, cancelar_assinatura,
-                            emitir_reembolso])
+                            emitir_reembolso, encaminhar_para_supervisao])
 
 
 def _options(server, system_prompt: str, model: str) -> ClaudeAgentOptions:
     names = [f"mcp__{SERVER}__{t}" for t in
-             ("consultar_conta", "cancelar_assinatura", "emitir_reembolso")]
+             ("consultar_conta", "cancelar_assinatura", "emitir_reembolso",
+              "encaminhar_para_supervisao")]
     return ClaudeAgentOptions(
         model=model,
         system_prompt=system_prompt,
@@ -134,9 +166,9 @@ def _options(server, system_prompt: str, model: str) -> ClaudeAgentOptions:
     )
 
 
-async def _ask(backend, guard, system_prompt, message, model) -> dict:
+async def _ask(backend, guard, system_prompt, message, model, caller) -> dict:
     refusals = []
-    server = make_server(backend, guard, refusals)
+    server = make_server(backend, guard, refusals, caller)
     calls, replies, cost = [], [], None
     with _without_api_key():
         # aclosing, not a bare async for: letting the loop shut down with the
@@ -162,7 +194,7 @@ async def _ask(backend, guard, system_prompt, message, model) -> dict:
 
 
 def ask(backend, guard, system_prompt: str, message: str,
-        model: Optional[str] = None) -> dict:
+        model: Optional[str] = None, caller: Optional[str] = None) -> dict:
     """One turn against the plan. Synchronous, for the comparison harness."""
     return asyncio.run(_ask(backend, guard, system_prompt, message,
-                            model or DEFAULT_MODEL))
+                            model or DEFAULT_MODEL, caller))

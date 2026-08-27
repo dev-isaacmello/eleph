@@ -1,13 +1,14 @@
 # A politica do suporte de assinaturas, escrita de forma conferivel.
 #
-# Duas regras que qualquer time de suporte tem por escrito em algum lugar, e
-# que nenhum sistema costuma checar:
+# Tres regras que qualquer time de suporte tem por escrito em algum lugar, e
+# que praticamente nenhum sistema checa:
 #
-#   1. So cancela quem esta ativo.
-#   2. So reembolsa cobranca que existe, ainda nao foi reembolsada, e cujo
-#      cliente ja cancelou.
+#   1. So responde sobre a conta de alguem quem se autenticou naquela conta.
+#   2. So cancela quem esta ativo.
+#   3. So reembolsa cobranca que caiu depois do cancelamento, ainda nao
+#      devolvida, e dentro da alcada do atendente.
 #
-# `eleph check` prova as duas para todo historico antes de qualquer agente
+# `eleph check` prova as tres para todo historico antes de qualquer agente
 # encostar nelas.
 
 program suporte
@@ -15,35 +16,46 @@ program suporte
 sort User
 sort Charge
 
+event autenticou(quem: Party, u: User)
+event deslogou(quem: Party, u: User)
+
 event subscribed(u: User)
 event cancelled(u: User)
-# A cobranca guarda, na propria identidade, se ela caiu antes ou depois do
-# cancelamento. Sem isso a politica tem uma brecha: cancelar hoje tornaria
-# reembolsavel uma cobranca de tres meses atras, e o agente chega la sozinho
-# fazendo duas coisas permitidas em sequencia.
-event charged_while_active(u: User, c: Charge)
-event charged_after_cancelling(u: User, c: Charge)
 event refunded(u: User, c: Charge)
 event settled(u: User, c: Charge)
 event statement_closed(u: User)
+event escalated(u: User, c: Charge)
 
-# Ativo quem assinou e nao cancelou desde entao. Nao existe campo `status`
-# em lugar nenhum: a resposta e uma consulta ao que aconteceu.
+# A cobranca guarda, na propria identidade, se caiu antes ou depois do
+# cancelamento, e quanto foi. Sem a primeira parte a politica tem brecha:
+# cancelar hoje tornaria reembolsavel uma cobranca de tres meses atras.
+event charged_while_active(u: User, c: Charge, amount: Number)
+event charged_after_cancelling(u: User, c: Charge, amount: Number)
+
+# Quem esta falando tem direito de falar sobre esta conta. Nao e sobre a
+# resposta ser verdadeira: e sobre esta pessoa poder ouvi-la. Um atendente que
+# informa com toda honestidade a conta de terceiro nao mentiu, e ainda assim e
+# um incidente.
+fact autorizado(Q: Party, U: User) := autenticou(Q, U) since_not deslogou(Q, U)
+
 fact active(U: User) := subscribed(U) since_not cancelled(U)
 
-# Cobranca em aberto: ocorreu e nao foi reembolsada desde entao.
-fact outstanding(U: User, C: Charge) := charged_while_active(U, C) since_not refunded(U, C)
+# Reembolsavel: caiu depois do cancelamento e ainda nao voltou.
+fact refundable(U: User, C: Charge) := charged_after_cancelling(U, C, amount > 0) since_not refunded(U, C)
 
-# Reembolsavel: caiu depois do cancelamento e ainda nao foi devolvida. O que
-# torna uma cobranca reembolsavel e quando ela ocorreu, nao o estado da conta
-# no momento em que alguem pergunta.
-fact refundable(U: User, C: Charge) := charged_after_cancelling(U, C) since_not refunded(U, C)
+# Alcada do atendente. Acima disso nao se recusa: escala.
+fact within_limit(U: User, C: Charge) := charged_after_cancelling(U, C, amount <= 200) since_not refunded(U, C)
 
-# O dinheiro voltou de fato, o que e diferente de ter sido autorizado.
+fact may_refund(U: User, C: Charge) := refundable(U, C) and within_limit(U, C)
+fact needs_escalation(U: User, C: Charge) := refundable(U, C) and not within_limit(U, C)
+
 fact settled_back(U: User, C: Charge) := settled(U, C) since_not refunded(U, C)
 
-on question(A, active(U)):
-    answer A with active(U)
+on question(Quem, active(U)) permitted autorizado(Quem, U):
+    answer Quem with active(U)
 
-on question(A, refundable(U, C)):
-    answer A with refundable(U, C)
+on question(Quem, may_refund(U, C)) permitted autorizado(Quem, U):
+    answer Quem with may_refund(U, C)
+
+on question(Quem, needs_escalation(U, C)) permitted autorizado(Quem, U):
+    answer Quem with needs_escalation(U, C)
