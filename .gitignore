@@ -31,3 +31,6 @@ bench/taubench/flights.json
 .idea/
 .vscode/
 .DS_Store
+
+# rascunho descartavel de divulgacao, nao faz parte do projeto
+ANUNCIO.md

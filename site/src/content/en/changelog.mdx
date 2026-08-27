@@ -12,6 +12,24 @@ versioning</a>. The canonical copy is <a
 href="https://github.com/dev-isaacmello/eleph/blob/main/CHANGELOG.md">CHANGELOG.md</a>.
 </p>
 
+## 0.4.1
+
+### Fixed
+
+Four ways the incremental index accepted a formula it could not keep. One was
+reported; the other three came out of generating valid programs at random and
+running every one under `Machine(audit=True)`. **Three of the four returned a
+wrong answer in silence**, which is worse than the one that raised.
+
+* `since_not` with a compound operand raised on the first event.
+* A quantifier whose body does not mention the bound variable.
+* A quantifier whose body is satisfied by an object that never occurred.
+* Atoms under a quantifier naming different variable sets, and a quantifier
+  inside a quantifier.
+
+Each now declines the index rather than guessing. See [honest
+limits](/docs/limits) for the five shapes and why the fold cannot see them.
+
 ## 0.4.0
 
 ### Added

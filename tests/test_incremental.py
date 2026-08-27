@@ -201,3 +201,145 @@ def test_free_vars_ignores_bound_ones():
     res = Resolver(prog)
     phi = res.resolve(prog.fact("seats_left").body, {"F": "Flight"})
     assert free_vars(phi) == ("F",)          # P is bound by the quantifier
+
+
+# --------------------------------------------------------------------------
+# A `since_not` whose operand is compound leaves what one step of the
+# recurrence can decide. The index used to accept the formula and raise on the
+# first event, which is the one behaviour neither path is allowed to have:
+# the fast path must be right, the slow path must be available, and neither
+# may be a crash.
+# --------------------------------------------------------------------------
+
+COMPOUND = """
+program repro
+sort Coisa
+event pos(c: Coisa)
+event neg_a(c: Coisa)
+event neg_b(c: Coisa)
+
+fact vale(C: Coisa) := pos(C) since_not (neg_a(C) or neg_b(C))
+
+on question(Q, vale(C)):
+    answer Q with vale(C)
+"""
+
+EQUIVALENT = """
+program contorno
+sort Coisa
+event pos(c: Coisa)
+event neg_a(c: Coisa)
+event neg_b(c: Coisa)
+
+fact vale(C: Coisa) := (pos(C) since_not neg_a(C)) and (pos(C) since_not neg_b(C))
+
+on question(Q, vale(C)):
+    answer Q with vale(C)
+"""
+
+
+def test_compound_since_not_declines_the_index_instead_of_raising():
+    from eleph import Policy
+
+    g = Policy(COMPOUND).guard()
+    assert g.machine.index.usable is False
+
+    # And it still answers, by rereading the log.
+    g.record("pos", "x")
+    assert g.holds("vale", "x") is True
+    g.record("neg_a", "x")
+    assert g.holds("vale", "x") is False
+    g.record("pos", "x")
+    assert g.holds("vale", "x") is True
+    g.record("neg_b", "x")
+    assert g.holds("vale", "x") is False
+
+
+def test_atom_operands_still_take_the_fast_path():
+    from eleph import Policy
+
+    assert Policy(EQUIVALENT).guard().machine.index.usable is True
+
+
+def test_the_slow_path_agrees_with_the_atom_rewrite():
+    """`p since_not (a or b)` is `(p since_not a) and (p since_not b)`.
+
+    There is a p after the last of a and b exactly when there is a p after each
+    of them. Checked exhaustively rather than argued: every history of up to
+    six events over the three event names."""
+    import itertools
+
+    from eleph import Policy
+
+    compound, rewritten = Policy(COMPOUND), Policy(EQUIVALENT)
+    for n in range(1, 7):
+        for history in itertools.product(["pos", "neg_a", "neg_b"], repeat=n):
+            a, b = compound.guard(), rewritten.guard()
+            for event in history:
+                a.record(event, "x")
+                b.record(event, "x")
+            assert a.holds("vale", "x") == b.holds("vale", "x"), history
+
+
+# --------------------------------------------------------------------------
+# Four ways the index accepted a formula it could not keep.
+#
+# Each was found by generating valid programs at random and running every one
+# under `audit=True`, which answers each query both ways. The first raised; the
+# other three returned a wrong answer in silence, which is worse. All four are
+# the same shape of mistake: a soundness check that did not cover a node type.
+# --------------------------------------------------------------------------
+
+def _guard(fact, extra_events=""):
+    from eleph import Policy
+
+    src = (
+        "program m\nsort S\nsort T\n"
+        "event e(p: S)\nevent o(p: S)\nevent d(p: S, q: S)\n"
+        f"{extra_events}"
+        f"{fact}\n"
+        "on question(Q, f(A)):\n    answer Q with f(A)\n"
+    )
+    return Policy(src).guard(audit=True)
+
+
+def test_quantifier_body_must_mention_the_bound_variable():
+    """`count A where phi(B)` does not vary with A, so no event moves it."""
+    assert _guard("fact f(A: S) := count B: S where d(A, A) >= 1").machine.index.usable is False
+    assert _guard("fact f(A: S) := exists B: S where d(A, A)").machine.index.usable is False
+    assert _guard("fact f(A: S) := exists B: S where d(B, A)").machine.index.usable is True
+
+
+def test_an_absent_object_must_not_satisfy_a_quantified_body():
+    """An object the log never saw joins the domain through an unrelated event.
+
+    `not e(B)` is true of it, and no atom of this node witnesses its arrival,
+    so the tally would move with nothing to move it."""
+    assert _guard("fact f(A: S) := exists B: S where not e(B)").machine.index.usable is False
+    assert _guard("fact f(A: S) := count B: S where not e(B) >= 1").machine.index.usable is False
+    # A body that needs a positive atom is safe: absence falsifies it.
+    assert _guard("fact f(A: S) := exists B: S where (e(B) and not o(B))").machine.index.usable is True
+
+
+def test_atoms_under_a_quantifier_must_name_the_same_variables():
+    assert _guard("fact f(A: S) := exists B: S where (e(B) or d(B, A))").machine.index.usable is False
+
+
+def test_a_quantifier_inside_a_quantifier_declines_the_index():
+    assert _guard(
+        "fact f(A: S) := exists B: S where count C: S where d(B, C) >= 1"
+    ).machine.index.usable is False
+
+
+def test_the_examples_still_take_the_fast_path():
+    """These four fixes must not have cost the repository its index."""
+    import pathlib
+
+    from eleph import Policy
+
+    root = pathlib.Path(__file__).parent.parent
+    for name in ("examples/companhia.eleph", "examples/airline.eleph",
+                 "examples/booking.eleph", "examples/fundo.eleph",
+                 "examples/langchain-agent/policy.eleph"):
+        guard = Policy.from_file(root / name).guard()
+        assert guard.machine.index.usable is True, name

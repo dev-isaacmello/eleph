@@ -4,6 +4,50 @@ All notable changes to this project are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [semantic versioning](https://semver.org/).
 
+## [0.4.1]
+
+### Fixed
+
+Four ways the incremental index accepted a formula it could not keep. The first
+was reported; the other three came out of generating valid programs at random
+and running every one under `Machine(audit=True)`, which answers each query
+both ways. Three of the four returned a **wrong answer in silence**, which is
+worse than the one that raised.
+
+* **`since_not` with a compound operand raised on the first event.**
+  `pos(C) since_not (neg_a(C) or neg_b(C))` passed `check` and then died with
+  `AttributeError: 'COr' object has no attribute 'name'`. Folding a `since_not`
+  asks whether the event matches each side, and only an atom has a name to
+  match against. `COnce` beside it already handled this; `CSinceNot` was
+  written assuming atoms and nothing stopped it being given anything else.
+
+* **A quantifier whose body does not mention the bound variable.**
+  `count A: S where phi(B)` is keyed by A and does not vary with it, so no
+  event ever moved the tally.
+
+* **A quantifier whose body is satisfied by an object that never occurred.**
+  `exists B: S where not e(B)` is true of every object the log has never seen,
+  and such an object joins the domain the moment any unrelated event names it.
+  No atom of the node witnesses that arrival. This is the domain corollary the
+  threshold relies on, which holds for positive atoms and not under a negation;
+  it is now checked rather than assumed.
+
+* **Atoms under a quantifier naming different variable sets, and a quantifier
+  inside a quantifier.** The first is the locality rule the accumulators were
+  already held to, which quantifiers were not. The second is outside what this
+  index keeps at all.
+
+Each declines the index rather than guessing: `Machine.index.usable` reports
+`False` and the program runs by rereading the log, which is the behaviour the
+documentation already promised for the locality case.
+
+`Machine(audit=True)` would not have caught the first of these on its own: the
+crash happens before there are two answers to compare. The audit covers
+disagreement, not absence.
+
+Every example in the repository still takes the fast path. Five new regression
+tests, and the honest limits page now lists all five shapes the index declines.
+
 ## [0.4.0]
 
 ### Added

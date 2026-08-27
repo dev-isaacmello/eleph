@@ -46,12 +46,24 @@ The compiler proves *some path* establishes it. It cannot prove the caller will
 walk that path, because no program can. See
 [commitments](/docs/concepts/commitments).
 
-## The index needs locality
+## The index does not keep every formula
 
-A subformula naming **fewer variables than its parent** makes one event disturb
-unboundedly many keys. Such programs still run, by rereading the log, and
-`Machine.index.usable` says so — but the constant-time claim does not apply to
-them.
+The fast path folds each event into the subformulas that event names. Five
+shapes leave what that fold can decide, and for each one the index declines:
+`Machine.index.usable` reports `False` and the program runs by rereading the
+log, which is correct but not constant time.
+
+| Shape | Why the fold cannot see it |
+|---|---|
+| a subformula naming **fewer variables than its parent** | one event disturbs unboundedly many keys |
+| `since_not` with a **compound operand** | folding asks whether the event matches each side, and only an atom has a name to match |
+| a quantifier whose body **does not mention the bound variable** | the tally does not vary with the variable it is keyed by |
+| a quantifier whose body is **satisfied by an object that never occurred** | that object joins the domain through an unrelated event, which no atom of the node witnesses |
+| a **quantifier inside a quantifier** | the inner tally depends on every object of the inner sort, so the snapshot is keyed too finely |
+
+Four of those five were found by generating valid programs at random and
+running every one under `audit=True`. Three of them returned a **wrong answer
+in silence** before being fixed, which is worse than the one that raised.
 
 ## `spoke` names the exchange, not the content
 

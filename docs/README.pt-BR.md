@@ -388,7 +388,7 @@ eleph talk        examples/companhia.eleph examples/conversa.txt --roster alice,
 python examples/agente.py            # the three integration shapes
 python bench/scaling.py              # constant time per event
 python bench/taubench/check.py       # the benchmark audit
-pytest -q                            # 156 tests
+pytest -q                            # 164 tests
 ```
 
 ## Fonte

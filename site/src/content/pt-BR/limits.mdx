@@ -46,12 +46,24 @@ O compilador prova que *algum caminho* a estabelece. Ele não pode provar que o
 interlocutor vai percorrer esse caminho, porque nenhum programa pode. Veja
 [compromissos](/docs/concepts/commitments).
 
-## O índice precisa de localidade
+## O índice não mantém toda fórmula
 
-Uma subfórmula que nomeia **menos variáveis que a pai** faz um evento perturbar
-ilimitadas chaves. Esses programas ainda rodam, relendo o log, e
-`Machine.index.usable` diz isso — mas a alegação de tempo constante não se aplica a
-eles.
+O caminho rápido dobra cada evento nas subfórmulas que esse evento nomeia. Cinco
+formas saem do que essa dobra consegue decidir, e para cada uma o índice se
+recusa: `Machine.index.usable` reporta `False` e o programa roda relendo o log,
+o que é correto mas não é tempo constante.
+
+| Forma | Por que a dobra não enxerga |
+|---|---|
+| subfórmula que nomeia **menos variáveis que a pai** | um evento perturba ilimitadas chaves |
+| `since_not` com **operando composto** | dobrar pergunta se o evento casa com cada lado, e só um átomo tem nome para casar |
+| quantificador cujo corpo **não menciona a variável ligada** | a contagem não varia com a variável que é a chave dela |
+| quantificador cujo corpo é **satisfeito por um objeto que nunca ocorreu** | esse objeto entra no domínio por um evento não relacionado, que nenhum átomo do nó testemunha |
+| **quantificador dentro de quantificador** | a contagem interna depende de todo objeto do sort interno, então o instantâneo tem chave fina demais |
+
+Quatro dessas cinco foram achadas gerando programas válidos ao acaso e rodando
+cada um com `audit=True`. Três delas devolviam **resposta errada em silêncio**
+antes da correção, o que é pior que a única que estourava.
 
 ## `spoke` nomeia a troca, não o conteúdo
 

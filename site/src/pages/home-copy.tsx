@@ -124,7 +124,7 @@ export const HOME: Record<Locale, HomeCopy> = {
     measuredLabel: 'Measured, not asserted',
     measuredTitle: 'Every number here was read by hand first.',
     stats: [
-      { value: '156', label: 'tests, run on 3.11, 3.12 and 3.13', source: 'pytest -q' },
+      { value: '164', label: 'tests, run on 3.11, 3.12 and 3.13', source: 'pytest -q' },
       {
         value: '~24k',
         label: 'events per second, flat as the log grows',
@@ -294,7 +294,7 @@ export const HOME: Record<Locale, HomeCopy> = {
     measuredLabel: 'Medido, não afirmado',
     measuredTitle: 'Todo número aqui foi lido à mão antes.',
     stats: [
-      { value: '156', label: 'testes, rodando em 3.11, 3.12 e 3.13', source: 'pytest -q' },
+      { value: '164', label: 'testes, rodando em 3.11, 3.12 e 3.13', source: 'pytest -q' },
       {
         value: '~24k',
         label: 'eventos por segundo, constante conforme o log cresce',
@@ -446,7 +446,7 @@ export const HOME: Record<Locale, HomeCopy> = {
     measuredLabel: '度量出来的，不是宣称出来的',
     measuredTitle: '这里每一个数字都先由人手工核对过。',
     stats: [
-      { value: '156', label: '个测试，在 3.11、3.12 和 3.13 上运行', source: 'pytest -q' },
+      { value: '164', label: '个测试，在 3.11、3.12 和 3.13 上运行', source: 'pytest -q' },
       {
         value: '~24k',
         label: '事件每秒，且随日志增长保持平稳',

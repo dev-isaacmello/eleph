@@ -12,6 +12,24 @@ semântico</a>. A cópia canônica é o <a
 href="https://github.com/dev-isaacmello/eleph/blob/main/CHANGELOG.md">CHANGELOG.md</a>.
 </p>
 
+## 0.4.1
+
+### Corrigido
+
+Quatro formas de o índice incremental aceitar uma fórmula que não conseguia
+manter. Uma foi reportada; as outras três saíram de gerar programas válidos ao
+acaso e rodar cada um com `Machine(audit=True)`. **Três das quatro devolviam
+resposta errada em silêncio**, o que é pior que a única que estourava.
+
+* `since_not` com operando composto estourava no primeiro evento.
+* Quantificador cujo corpo não menciona a variável ligada.
+* Quantificador cujo corpo é satisfeito por um objeto que nunca ocorreu.
+* Átomos sob um quantificador nomeando conjuntos diferentes de variáveis, e
+  quantificador dentro de quantificador.
+
+Cada uma agora recusa o índice em vez de chutar. Veja [limites
+honestos](/docs/limits) para as cinco formas e por que a dobra não as enxerga.
+
 ## 0.4.0
 
 ### Adicionado
