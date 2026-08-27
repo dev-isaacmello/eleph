@@ -1,6 +1,6 @@
 [project]
 name = "eleph"
-version = "0.3.0"
+version = "0.4.0"
 description = "A language whose programs cannot lie: speech acts, a history that is the only state, and correctness conditions derived from the program text rather than written beside it."
 readme = "README.md"
 requires-python = ">=3.11"
@@ -36,9 +36,11 @@ Changelog = "https://github.com/dev-isaacmello/eleph/blob/main/CHANGELOG.md"
 
 [project.scripts]
 eleph = "eleph.cli:main"
+eleph-mcp = "eleph.mcp_server:main"
 
 [project.optional-dependencies]
 dev = ["pytest>=8"]
+mcp = ["mcp>=2.0"]             # only for the MCP server
 claude = ["anthropic>=0.40"]   # only for the natural language front end
 langchain = [                  # only for examples/langchain-agent
     "langchain>=1.0",

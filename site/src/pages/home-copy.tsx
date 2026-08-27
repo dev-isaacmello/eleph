@@ -124,7 +124,7 @@ export const HOME: Record<Locale, HomeCopy> = {
     measuredLabel: 'Measured, not asserted',
     measuredTitle: 'Every number here was read by hand first.',
     stats: [
-      { value: '146', label: 'tests, run on 3.11, 3.12 and 3.13', source: 'pytest -q' },
+      { value: '156', label: 'tests, run on 3.11, 3.12 and 3.13', source: 'pytest -q' },
       {
         value: '~24k',
         label: 'events per second, flat as the log grows',
@@ -163,12 +163,14 @@ export const HOME: Record<Locale, HomeCopy> = {
       },
     ],
     pythonLabel: 'Use it from Python',
-    pythonTitle: 'The language is the research artifact. This is what ships.',
+    pythonTitle: 'Four calls, and none of them need the language.',
     pythonLede: (
       <>
-        The reason to keep the rules in a policy file rather than writing the checks in
-        Python is the second line below: the rules your guard enforces at three in the
-        morning are the same artifact a solver proved.
+        <code>record</code> what happened, <code>require</code> before a tool runs,{' '}
+        <code>assert_answer</code> before a claim ships, <code>promise</code> what you
+        owe. That is the integration. The rules live in a file a solver proved, which is
+        the difference between a guard whose rules were checked and one whose rules
+        somebody believed.
       </>
     ),
     shapeHead: ['Shape', 'You change', 'You get'],
@@ -292,7 +294,7 @@ export const HOME: Record<Locale, HomeCopy> = {
     measuredLabel: 'Medido, não afirmado',
     measuredTitle: 'Todo número aqui foi lido à mão antes.',
     stats: [
-      { value: '146', label: 'testes, rodando em 3.11, 3.12 e 3.13', source: 'pytest -q' },
+      { value: '156', label: 'testes, rodando em 3.11, 3.12 e 3.13', source: 'pytest -q' },
       {
         value: '~24k',
         label: 'eventos por segundo, constante conforme o log cresce',
@@ -331,12 +333,14 @@ export const HOME: Record<Locale, HomeCopy> = {
       },
     ],
     pythonLabel: 'Use a partir do Python',
-    pythonTitle: 'A linguagem é o artefato de pesquisa. Isto é o que vai para produção.',
+    pythonTitle: 'Quatro chamadas, e nenhuma delas precisa da linguagem.',
     pythonLede: (
       <>
-        A razão para manter as regras num arquivo de política em vez de escrever as
-        verificações em Python é a segunda linha abaixo: as regras que sua guarda aplica às
-        três da manhã são o mesmo artefato que um solver provou.
+        <code>record</code> o que aconteceu, <code>require</code> antes de uma ferramenta
+        rodar, <code>assert_answer</code> antes de uma afirmação ir ao ar,{' '}
+        <code>promise</code> o que você deve. Isso é a integração. As regras vivem num
+        arquivo que um solver provou, que é a diferença entre uma guarda cujas regras
+        foram conferidas e uma cujas regras alguém acreditou.
       </>
     ),
     shapeHead: ['Forma', 'Você muda', 'Você ganha'],
@@ -442,7 +446,7 @@ export const HOME: Record<Locale, HomeCopy> = {
     measuredLabel: '度量出来的，不是宣称出来的',
     measuredTitle: '这里每一个数字都先由人手工核对过。',
     stats: [
-      { value: '146', label: '个测试，在 3.11、3.12 和 3.13 上运行', source: 'pytest -q' },
+      { value: '156', label: '个测试，在 3.11、3.12 和 3.13 上运行', source: 'pytest -q' },
       {
         value: '~24k',
         label: '事件每秒，且随日志增长保持平稳',
@@ -480,10 +484,10 @@ export const HOME: Record<Locale, HomeCopy> = {
       },
     ],
     pythonLabel: '在 Python 中使用',
-    pythonTitle: '语言是研究产物。真正上线的是这个。',
+    pythonTitle: '四个调用，而且没有一个需要这门语言。',
     pythonLede: (
       <>
-        把规则放在策略文件里、而不是用 Python 写检查逻辑，理由就在下面第二行：你的守卫在凌晨三点执行的规则，和求解器证明过的是同一份产物。
+        <code>record</code> 发生了什么，在工具运行前 <code>require</code>，在主张发出去前 <code>assert_answer</code>，欠下什么就 <code>promise</code>。这就是集成的全部。规则活在一个求解器证明过的文件里，而这正是「规则被检查过的守卫」和「规则只是被某人相信的守卫」之间的差别。
       </>
     ),
     shapeHead: ['形态', '你需要改什么', '你得到什么'],

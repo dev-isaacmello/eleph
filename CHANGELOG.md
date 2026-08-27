@@ -4,6 +4,34 @@ All notable changes to this project are recorded here. The format follows
 [Keep a Changelog](https://keepachangelog.com/en/1.1.0/) and the project uses
 [semantic versioning](https://semver.org/).
 
+## [0.4.0]
+
+### Added
+
+* **An MCP server** (`eleph-mcp`, behind the `mcp` extra). Four tools, all
+  stateless and none of them touching the disk or the network:
+  `eleph_check` discharges every obligation and returns the history that breaks
+  the rule; `eleph_obligations` prints the conditions without discharging them;
+  `eleph_simulate` replays a sequence of events through a guard and reports
+  what it refuses; `eleph_declarations` lists what a policy declares, with each
+  fact expanded to the formula it stands for.
+
+  It serves the checker rather than the documentation on purpose. A server that
+  only recited the docs would let a model write a policy from memory and hand
+  it over unverified, which is the failure this project exists to stop. The
+  client already knows how to read a file; what it cannot do is run Z3.
+
+* **A skill** (`skills/eleph/SKILL.md`) for the coding assistant of somebody
+  using eleph. It carries the write-check-fix loop and the limits that mean a
+  rule cannot be expressed, so a model stops instead of approximating.
+
+### Fixed
+
+* Thirty three fact declarations in the documentation were wrapped across
+  lines, which does not parse: a fact body cannot span lines, and the grammar
+  page said the opposite in all three languages. A CI step now hands every
+  program printed on the documentation site to `eleph check`.
+
 ## [0.3.0]
 
 ### Added
