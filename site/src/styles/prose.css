@@ -106,13 +106,16 @@
   font-style: italic;
 }
 
+/* An identifier holds together while it fits and breaks when it does not.
+   Refusing to wrap at all made a long one drag the page sideways on a phone;
+   table cells keep their nowrap further down, because that wrap scrolls. */
 .prose :not(pre) > code {
   background: var(--bg-inset);
   border: 1px solid var(--border);
   border-radius: var(--radius-sm);
   padding: 0.09em 0.34em;
   font-size: 0.855em;
-  white-space: nowrap;
+  overflow-wrap: break-word;
 }
 
 .prose a:not(.heading-anchor__link) {
@@ -182,6 +185,7 @@
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  min-width: 0;
   padding: 0.4rem 0.85rem;
   border: 1px solid var(--border);
   border-bottom: 0;
@@ -268,8 +272,10 @@
   opacity: 1;
 }
 
+/* Over a titled block the button centres in the head band rather than hanging
+   off its lower edge. */
 .code-block__head ~ .copy-button {
-  top: 0.35rem;
+  top: 3px;
 }
 
 /* ---------------------------------------------------------------- callout */
@@ -288,6 +294,14 @@
 .callout > svg {
   flex: none;
   margin-top: 0.22rem;
+}
+
+/* A flex item refuses to shrink past its content by default, and a code block
+   inside a callout has no natural narrow width; without this the callout drags
+   the whole page sideways on a phone. */
+.callout__body {
+  flex: 1;
+  min-width: 0;
 }
 
 .callout__body > * + * {
@@ -385,12 +399,14 @@
   font-size: var(--text-xs);
 }
 
-/* The head of a Snippet carries a link; keep it on one line with its icon. */
+/* The head of a Snippet carries a link and its icon. A file path holds
+   together; a sentence long title wraps rather than escaping the frame. */
 .code-block__head a {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  white-space: nowrap;
+  min-width: 0;
+  overflow-wrap: anywhere;
   color: var(--fg-muted);
 }
 

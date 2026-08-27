@@ -1,13 +1,18 @@
 /* --------------------------------------------------------------- search */
 
+/* Same height and same corner as the icon buttons it sits beside; it is wider,
+   not taller. It is also the one header control that may shrink. */
 .search-trigger {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  min-width: 12.5rem;
-  padding: 0.32rem 0.5rem 0.32rem 0.65rem;
+  flex: 0 1 auto;
+  width: 12.5rem;
+  min-width: 0;
+  height: var(--control-h);
+  padding: 0 0.5rem 0 0.65rem;
   border: 1px solid var(--border);
-  border-radius: var(--radius);
+  border-radius: var(--radius-sm);
   background: var(--bg-subtle);
   color: var(--fg-faint);
   font-size: var(--text-sm);
@@ -20,7 +25,19 @@
   color: var(--fg-muted);
 }
 
+.search-trigger > svg {
+  flex: none;
+}
+
+.search-trigger__text {
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
 .search-trigger__kbd {
+  flex: none;
   margin-left: auto;
   font-family: var(--font-mono);
   font-size: var(--text-xs);
@@ -66,6 +83,13 @@
   font-size: var(--text-md);
 }
 
+/* The field suppresses its own ring, so the row it sits in has to say where
+   the caret is; otherwise tabbing back from the results lands nowhere. */
+.search-dialog__field:focus-within {
+  border-bottom-color: var(--accent);
+  color: var(--fg-muted);
+}
+
 .search-dialog__results {
   list-style: none;
   margin: 0;
@@ -84,6 +108,13 @@
 .search-result[data-active='true'] {
   background: var(--accent-soft);
   color: var(--fg);
+}
+
+/* Three separate lines: the page it is in, the heading, the excerpt. As
+   inline spans the first two ran together into "Python APIGuard". */
+.search-result__crumb,
+.search-result__title {
+  display: block;
 }
 
 .search-result__crumb {
@@ -138,16 +169,27 @@
 }
 
 @media (max-width: 900px) {
-  .search-trigger {
-    min-width: 0;
-  }
-
   .search-trigger__text,
   .search-trigger__kbd {
     display: none;
   }
 
+  /* With the label gone it is an icon button, so it measures and paints like
+     one instead of sitting boxed among three bare glyphs. */
   .search-trigger {
-    padding: 0.35rem;
+    flex: none;
+    justify-content: center;
+    width: var(--control-h);
+    padding: 0;
+    border-color: transparent;
+    border-radius: var(--radius-sm);
+    background: transparent;
+    color: var(--fg-muted);
+  }
+
+  .search-trigger:hover {
+    border-color: transparent;
+    background: var(--bg-inset);
+    color: var(--fg);
   }
 }

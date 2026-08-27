@@ -49,10 +49,11 @@ select {
   color: inherit;
 }
 
+/* The ring follows whatever radius the element already has; setting a radius
+   here would square off every rounded control the moment it took focus. */
 :focus-visible {
   outline: 2px solid var(--accent);
   outline-offset: 2px;
-  border-radius: 3px;
 }
 
 ::selection {
