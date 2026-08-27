@@ -1,0 +1,15 @@
+```out
+$ eleph check examples/companhia.eleph
+
+  6 obrigacoes derivadas do texto do programa
+  cada uma checada no seu limiar de completude (o maior: 10 eventos) -- exaustivo
+
+  ok  question(C, has_reservation)  linha 30  -  a resposta responde a pergunta feita
+  ok  question(C, has_seat)         linha 33  -  a resposta responde a pergunta feita
+  ok  question(C, seats_left)       linha 36  -  a resposta responde a pergunta feita
+  ok  request(C, make_reservation)  linha 45  -  a promessa esta cumprida ao ser feita
+  ok  request(C, make_reservation)  linha 46  -  a promessa pode vir a ser cumprida
+  ok  request(C, cancel_reservation) linha 61 -  a promessa esta cumprida ao ser feita
+
+PROVADO  -  6 obrigacoes valem para TODO historico, de qualquer tamanho
+```

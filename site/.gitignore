@@ -1,0 +1,7 @@
+node_modules
+dist
+.vercel
+src/generated/search-index.json
+*.tsbuildinfo
+public/sitemap.xml
+public/robots.txt

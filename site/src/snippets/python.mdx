@@ -1,0 +1,16 @@
+```python
+from eleph import Policy
+
+policy = Policy.from_file("booking.eleph")
+assert policy.verify().proved          # the same file, proved statically
+
+g = policy.guard(log="booking.jsonl")  # durable, reopening replays
+
+g.record("make_reservation", "alice", "ba117")
+g.holds("has_reservation", "alice", "ba117")                  # True
+g.assert_answer("has_reservation", False, "alice", "ba117")   # raises
+
+g.promise("alice", "has_seat", "alice", "ba117",
+          before=("board", ("alice", "ba117")))
+g.outstanding()        # what is still owed, to whom
+```

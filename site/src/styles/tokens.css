@@ -1,0 +1,117 @@
+/* ---------------------------------------------------------------------------
+   Design tokens.
+
+   Two themes, one set of names. Every colour a component uses is a semantic
+   token, so the dark block below is the only place a dark value is written.
+   --------------------------------------------------------------------------- */
+
+:root {
+  color-scheme: light;
+
+  /* Ink and paper */
+  --bg: #fffefb;
+  --bg-subtle: #f7f5f0;
+  --bg-inset: #f1efe8;
+  --bg-code: #f7f6f3;
+  --bg-elevated: #ffffff;
+  --overlay: rgba(28, 26, 23, 0.44);
+
+  --fg: #1b1917;
+  --fg-muted: #5c574f;
+  --fg-faint: #8a847a;
+
+  --border: #e5e1d8;
+  --border-strong: #d2cdc2;
+
+  /* The one accent. Elephants are grey; the ink they leave is not. */
+  --accent: #b5441f;
+  --accent-hover: #96371a;
+  --accent-soft: rgba(181, 68, 31, 0.1);
+  --accent-fg: #ffffff;
+
+  --ok: #2f7a41;
+  --ok-soft: rgba(47, 122, 65, 0.1);
+  --warn: #9a6a12;
+  --warn-soft: rgba(154, 106, 18, 0.11);
+  --bad: #b3261e;
+  --bad-soft: rgba(179, 38, 30, 0.1);
+
+  /* Type */
+  --font-sans: 'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI',
+    Roboto, 'Helvetica Neue', Arial, sans-serif;
+  --font-serif: 'Newsreader', ui-serif, Georgia, 'Times New Roman', serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, 'SF Mono', 'Cascadia Mono',
+    Menlo, Consolas, monospace;
+
+  --text-xs: 0.75rem;
+  --text-sm: 0.8125rem;
+  --text-base: 0.9375rem;
+  --text-md: 1rem;
+  --text-lg: 1.125rem;
+  --text-xl: 1.375rem;
+  --text-2xl: 1.75rem;
+  --text-3xl: 2.25rem;
+  --text-4xl: clamp(2.4rem, 1.6rem + 3.4vw, 4rem);
+
+  /* Space and shape */
+  --radius-sm: 5px;
+  --radius: 9px;
+  --radius-lg: 14px;
+
+  --shadow-sm: 0 1px 2px rgba(24, 22, 19, 0.06);
+  --shadow: 0 8px 26px -12px rgba(24, 22, 19, 0.22);
+  --shadow-lg: 0 24px 60px -22px rgba(24, 22, 19, 0.36);
+
+  /* Layout */
+  --header-h: 56px;
+  --sidebar-w: 17rem;
+  --toc-w: 15rem;
+  --content-max: 46rem;
+  --page-max: 92rem;
+  --gutter: 1.5rem;
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --bg: #131211;
+  --bg-subtle: #1a1917;
+  --bg-inset: #201f1c;
+  --bg-code: #1a1917;
+  --bg-elevated: #1c1b19;
+  --overlay: rgba(0, 0, 0, 0.66);
+
+  --fg: #ece8e1;
+  --fg-muted: #a8a299;
+  --fg-faint: #7b756c;
+
+  --border: #2c2a26;
+  --border-strong: #3d3a35;
+
+  --accent: #f08a5f;
+  --accent-hover: #f5a381;
+  --accent-soft: rgba(240, 138, 95, 0.13);
+  --accent-fg: #16130f;
+
+  --ok: #5fbd74;
+  --ok-soft: rgba(95, 189, 116, 0.13);
+  --warn: #d9a441;
+  --warn-soft: rgba(217, 164, 65, 0.13);
+  --bad: #ef6b62;
+  --bad-soft: rgba(239, 107, 98, 0.13);
+
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow: 0 8px 26px -12px rgba(0, 0, 0, 0.6);
+  --shadow-lg: 0 24px 60px -20px rgba(0, 0, 0, 0.72);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

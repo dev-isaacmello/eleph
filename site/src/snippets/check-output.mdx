@@ -1,0 +1,18 @@
+```out
+$ eleph check examples/airline_buggy.eleph
+
+  X   question(Caller, has_reservation)  linha 17  -  resposta yes e verdadeira
+      neste caminho o programa afirma que vale (make_reservation(P, F) e
+      desde entao nenhum cancel_reservation(P, F))
+
+      historico que quebra a obrigacao:
+        1. make_reservation(P, F)
+        2. cancel_reservation(P, F)
+        3. disse-ask-sobre-has_reservation(Caller, P, F)
+
+      o programa responde yes, a verdade do log e no
+
+  ok  question(Caller, has_reservation)  linha 19  -  resposta no e verdadeira
+
+REPROVADO  -  1 obrigacao nao cumprida
+```

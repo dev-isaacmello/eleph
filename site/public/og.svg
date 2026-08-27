@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="630" viewBox="0 0 1200 630">
+  <rect width="1200" height="630" fill="#131211"/>
+  <g fill="none" stroke="#2c2a26" stroke-width="1">
+    <path d="M0 160h1200M0 470h1200"/>
+  </g>
+  <path d="M96 210v56a30 30 0 0 0 30 30h6a24 24 0 0 1 24 24v14"
+        fill="none" stroke="#f08a5f" stroke-width="10"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="156" cy="222" r="14" fill="#f08a5f"/>
+  <text x="96" y="392" font-family="Georgia, serif" font-size="86" fill="#ece8e1">
+    A language whose programs
+  </text>
+  <text x="96" y="470" font-family="Georgia, serif" font-size="86" fill="#ece8e1">
+    cannot lie.
+  </text>
+  <text x="96" y="546" font-family="ui-monospace, monospace" font-size="28" fill="#a8a299">
+    eleph  ·  speech acts, a history that is the only state
+  </text>
+</svg>

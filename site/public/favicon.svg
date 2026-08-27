@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" width="32" height="32">
+  <rect width="32" height="32" rx="7" fill="#1b1917"/>
+  <!-- A trunk, drawn as the one thing it never lets go of: the past. -->
+  <path d="M11 8v9a5 5 0 0 0 5 5h1a4 4 0 0 1 4 4v2"
+        fill="none" stroke="#f08a5f" stroke-width="2.6"
+        stroke-linecap="round" stroke-linejoin="round"/>
+  <circle cx="21" cy="10" r="2.4" fill="#f08a5f"/>
+</svg>
