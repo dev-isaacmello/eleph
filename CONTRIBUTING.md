@@ -61,6 +61,52 @@ network.
 Follow the surrounding code. Portuguese in user facing CLI strings, English in
 identifiers, docstrings and comments. Do not use the em dash character.
 
+## Releasing
+
+Pushing a tag publishes. `.github/workflows/release.yml` does the work, and
+most of what it does is refuse to.
+
+```bash
+# 1. bump the single source of truth
+$EDITOR pyproject.toml        # version = "0.4.0"
+
+# 2. say what changed
+$EDITOR CHANGELOG.md
+
+# 3. commit, tag, push
+git commit -am "chore: release 0.4.0"
+git tag -a v0.4.0 -m "eleph 0.4.0"
+git push origin main --tags
+```
+
+The workflow then checks, in order, that the tag agrees with
+`pyproject.toml`, that the version has never been published (PyPI never lets a
+version be replaced or reused, so this is the last moment it can be caught),
+that the tests pass on both the oldest and the newest supported interpreter,
+that the artifacts are well formed, and that the built wheel installs into a
+clean environment and still proves and refuses the right programs. Only then
+does it upload, and cut a GitHub release with the artifacts attached.
+
+`3.11` in that list is not ceremony. The one bug that reached a published
+version was a syntax error only 3.11 saw.
+
+`__version__` is read from the installed package metadata rather than written
+down a second time. A version repeated in two files is a version that will
+eventually disagree with itself, quietly, in a release.
+
+### Setting it up
+
+The workflow needs one repository secret, `PYPI_API_TOKEN`, scoped to this
+project rather than to the whole account. It runs in a GitHub environment named
+`pypi`, so required reviewers can be added there if uploads should be approved
+by a human.
+
+To rehearse without publishing anything, run the workflow manually from the
+Actions tab with `dry_run` left checked: everything happens except the upload.
+
+Trusted publishing is the better arrangement if you would rather not keep a
+token at all, and would replace the secret with an OIDC exchange.
+
 ## Licence
 
 By contributing you agree your work is released under the MIT licence in

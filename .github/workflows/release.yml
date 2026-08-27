@@ -1,0 +1,101 @@
+name: release
+
+# Publishing is triggered by a tag, and a tag is a claim about a version. The
+# job's first duty is to check that claim before anything is uploaded, because
+# a version published to PyPI can never be replaced or reused.
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Build and check, but do not publish"
+        type: boolean
+        default: true
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    environment: pypi          # add required reviewers here to gate uploads
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: the tag and pyproject.toml must agree
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          set -e
+          TAG="${GITHUB_REF_NAME#v}"
+          PKG=$(grep -m1 '^version' pyproject.toml | sed 's/.*"\(.*\)".*/\1/')
+          echo "tag=$TAG  pyproject=$PKG"
+          if [ "$TAG" != "$PKG" ]; then
+            echo "::error::a tag diz $TAG e o pyproject.toml diz $PKG"
+            exit 1
+          fi
+
+      - name: this version has not already been published
+        if: startsWith(github.ref, 'refs/tags/')
+        run: |
+          set -e
+          V="${GITHUB_REF_NAME#v}"
+          CODE=$(curl -s -o /dev/null -w '%{http_code}' "https://pypi.org/pypi/eleph/$V/json")
+          if [ "$CODE" = "200" ]; then
+            echo "::error::eleph $V ja existe no PyPI, e uma versao publicada nunca pode ser substituida"
+            exit 1
+          fi
+
+      # The oldest and the newest supported interpreter. The last release bug
+      # was a syntax error that only 3.11 saw, so 3.11 is not optional here.
+      - name: tests on the oldest and newest supported python
+        run: |
+          set -e
+          for PY in 3.11 3.13; do
+            rm -rf .venv
+            uv venv --python $PY
+            uv run python -c "import sys; assert sys.version.startswith('$PY'), sys.version"
+            uv pip install -e ".[dev,langchain]"
+            uv run pytest -q
+          done
+
+      - name: build
+        run: |
+          rm -rf .venv dist
+          uv venv
+          uv build
+
+      - name: the artifacts are well formed
+        run: |
+          uv pip install twine
+          uv run twine check dist/*
+
+      - name: the wheel installs and the language works
+        run: |
+          set -e
+          rm -rf /tmp/smoke && uv venv /tmp/smoke
+          VIRTUAL_ENV=/tmp/smoke uv pip install dist/*.whl
+          /tmp/smoke/bin/eleph check examples/companhia.eleph --no-color | tail -2 | grep -q PROVADO
+          /tmp/smoke/bin/eleph check examples/fundo.eleph --no-color | tail -2 | grep -q REPROVADO
+          /tmp/smoke/bin/python -c "import eleph; print('installed', eleph.__version__)"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      - name: publish to pypi
+        if: startsWith(github.ref, 'refs/tags/') && inputs.dry_run != true
+        env:
+          UV_PUBLISH_TOKEN: ${{ secrets.PYPI_API_TOKEN }}
+        run: uv publish
+
+      - name: github release
+        if: startsWith(github.ref, 'refs/tags/') && inputs.dry_run != true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --title "eleph $GITHUB_REF_NAME" \
+            --notes "See [CHANGELOG.md](https://github.com/dev-isaacmello/eleph/blob/main/CHANGELOG.md)."

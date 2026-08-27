@@ -11,6 +11,8 @@ For embedding in a Python system, start with `Policy`:
     g = policy.guard(log="booking.jsonl")
 """
 
+from importlib.metadata import PackageNotFoundError, version as _version
+
 from .guard import Guard, Policy, Ungrounded, UnknownName, VerifyReport
 from .runtime import Commitment, Event, Machine, NotPermitted, Refusal
 from .store import Store
@@ -18,4 +20,10 @@ from .store import Store
 __all__ = ["Policy", "Guard", "VerifyReport", "Ungrounded", "UnknownName",
            "Commitment", "Event", "Machine", "NotPermitted", "Refusal",
            "Store"]
-__version__ = "0.3.0"
+try:
+    # One source of truth, and it is pyproject.toml. A version repeated in two
+    # files is a version that will eventually disagree with itself, quietly,
+    # in a release.
+    __version__ = _version("eleph")
+except PackageNotFoundError:            # running from a checkout, not installed
+    __version__ = "0.0.0+unknown"
