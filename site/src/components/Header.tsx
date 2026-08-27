@@ -2,6 +2,7 @@ import { Link, NavLink } from 'react-router-dom'
 
 import { site } from '@/lib/site'
 import { IconGitHub, IconMenu, IconClose } from './Icons'
+import { LanguageMenu } from './LanguageMenu'
 import { Search } from './Search'
 import { ThemeToggle } from './ThemeToggle'
 
@@ -58,16 +59,17 @@ export function Header({
       </a>
 
       <nav className="header__nav" aria-label="Primary">
+        <NavLink to="/docs/use/start-here">Use it</NavLink>
         <NavLink to="/docs">Docs</NavLink>
         <NavLink to="/docs/reference/program-structure">Reference</NavLink>
         <NavLink to="/docs/python-api">Python API</NavLink>
-        <NavLink to="/docs/taubench">Benchmark</NavLink>
       </nav>
 
       <span className="header__spacer" />
 
       <div className="header__actions">
         <Search />
+        <LanguageMenu />
         <ThemeToggle />
         <a
           className="icon-button"
