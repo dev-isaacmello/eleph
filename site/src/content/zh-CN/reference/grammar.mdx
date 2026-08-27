@@ -1,0 +1,135 @@
+---
+title: 文法
+description: eleph 完整的表层语法、关键字与词法规则。
+---
+
+# 文法
+
+<p className="lede">
+整套表层语法，都在这一页。它是有意做小的。
+</p>
+
+## 记法
+
+`x*` 表示零次或多次，`x+` 表示一次或多次，`[x]` 表示可选，`|` 表示选择。`INDENT` 和
+`DEDENT` 由词法分析器从行首空格产生，Python 风格。
+
+## 程序
+
+```text
+program        ::= "program" IDENT NEWLINE decl*
+
+decl           ::= sort_decl | event_decl | fact_decl | handler
+
+sort_decl      ::= "sort" IDENT NEWLINE
+event_decl     ::= "event" IDENT param_list NEWLINE
+fact_decl      ::= "fact" IDENT param_list ":=" texpr NEWLINE
+
+param_list     ::= [ "(" [ param ("," param)* ] ")" ]
+param          ::= IDENT [ ":" IDENT ]
+```
+
+## 处理器
+
+```text
+handler        ::= "on" performative "(" IDENT "," ref ")"
+                   [ "permitted" ref ] ":" NEWLINE block
+
+performative   ::= "question" | "request"
+
+block          ::= INDENT stmt+ DEDENT
+```
+
+## 语句
+
+```text
+stmt           ::= if_stmt
+                 | answer_stmt
+                 | "record" ref NEWLINE
+                 | ("accept" | "decline") IDENT [ ref ] NEWLINE
+                 | promise_stmt
+                 | "offer" IDENT "that" texpr NEWLINE
+                 | "release" IDENT "from" texpr NEWLINE
+
+if_stmt        ::= "if" texpr ":" NEWLINE block
+                   [ "else" ":" NEWLINE block ]
+
+answer_stmt    ::= "answer" IDENT ( "yes" | "no" | "with" texpr ) NEWLINE
+
+promise_stmt   ::= "promise" IDENT "eventually" texpr NEWLINE
+                 | "promise" IDENT "that" texpr [ "before" ref ] NEWLINE
+```
+
+## 时态表达式
+
+```text
+texpr          ::= or_expr
+or_expr        ::= and_expr ( "or" and_expr )*
+and_expr       ::= since_expr ( "and" since_expr )*
+since_expr     ::= unary [ "since_not" unary ]
+unary          ::= "not" unary | primary
+
+primary        ::= "(" texpr ")"
+                 | "yes" | "no"
+                 | "exists" binder since_expr
+                 | "count" binder since_expr comparison
+                 | "count" ref comparison
+                 | "spoke" perf "to" IDENT "about" ref
+                 | ref
+
+binder         ::= IDENT ":" IDENT "where"
+comparison     ::= OP NUMBER
+perf           ::= "answer" | "accept" | "decline" | "promise" | "ask"
+
+ref            ::= IDENT [ "(" [ arg ("," arg)* ] ")" ]
+arg            ::= IDENT [ OP NUMBER ]
+```
+
+带比较的 `arg` 产生式就是数值字段那种形式：`charged(U, C, amount > 100)`。
+
+## Tokens
+
+```text
+NUMBER   ::= [0-9]+
+IDENT    ::= [A-Za-z_][A-Za-z_0-9]*
+ASSIGN   ::= ":="
+OP       ::= ">=" | "<=" | "==" | "!=" | "<" | ">"
+PUNCT    ::= "(" | ")" | ":" | ","
+COMMENT  ::= "#" .*
+```
+
+## 关键字
+
+保留字，不能用作标识符：
+
+```text
+program  event  fact  on  if  else  answer  with
+yes  no  record  accept  decline  promise  that
+not  and  or  since_not  count  to
+sort  exists  where
+spoke  about
+eventually  before  release  from
+permitted  offer
+```
+
+这份清单在 <Source file="eleph/lexer.py" />，顺序相同。
+
+## 词法规则
+
+* 空行和只有注释的行**不承载缩进语义**。
+* 缩进必须用空格。行首空白里出现制表符是错误：
+  `linha N: use espacos, nao tabs, para indentar`。
+* 减少缩进时必须回到某个曾经打开过的层级，否则：
+  `linha N: indentacao inconsistente`。
+* 没有续行。跨行的表达式必须写在已经缩进的块内并加括号 —— 实践中，把事实写在一行里，
+  或者在 `:=` 之后换行。
+
+## 错误
+
+有三类异常会到达命令行，三者都以状态码 `2` 退出：
+
+| 异常 | 由谁抛出 | 消息示例 |
+|---|---|---|
+| `LexError` | <Source file="eleph/lexer.py" /> | `linha 4: caractere inesperado '@'` |
+| `ParseError` | <Source file="eleph/parser.py" /> | `linha 9: esperava 'yes', 'no' ou 'with'` |
+| `ResolveError` | <Source file="eleph/core.py" /> | 未知的名字，或者元数、sort 不匹配 |

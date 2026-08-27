@@ -1,0 +1,156 @@
+---
+title: 安装
+description: 从 PyPI 或源码安装 eleph。需要 Python 3.11 或更新版本，以及 Z3。
+---
+
+# 安装
+
+<p className="lede">
+eleph 是一个 Python 包，只有一个运行时依赖：Z3 定理证明器，它负责消解那些义务。
+</p>
+
+## 要求
+
+| | |
+|---|---|
+| Python | 3.11、3.12 或 3.13 |
+| 依赖 | `z3-solver >= 4.12` |
+| 许可证 | MIT |
+
+Python 3.11 是下限，每次推送都会在 CI 上连同 3.12 和 3.13 一起测试。
+
+## 装进一个项目
+
+```bash
+uv add eleph          # 或： pip install eleph
+```
+
+这会安装可导入的包和 `eleph` 命令。
+
+<Callout type="danger" title="uv add 不会把 eleph 放进你的 PATH">
+`uv add` 装进项目的 `.venv`，所以可执行文件落在 `.venv/bin/eleph`，shell 找不到它：
+
+```bash
+$ eleph check policy.eleph
+zsh: command not found: eleph
+```
+
+通过拥有它的那个环境去访问：
+
+```bash
+uv run eleph check policy.eleph     # 不需要激活
+```
+
+或者先激活环境：
+
+```bash
+source .venv/bin/activate
+eleph check policy.eleph
+```
+</Callout>
+
+## 作为一个到处可用的命令
+
+如果你要的是命令行工具，而不是某个项目里的库，就把它作为工具安装。它会得到自己的隔离
+环境，并进入你的 PATH：
+
+```bash
+uv tool install eleph
+```
+
+```bash
+$ command -v eleph
+~/.local/bin/eleph
+```
+
+`uv tool uninstall eleph` 可以卸载。用 pip 的话，对应的是
+[`pipx`](https://pipx.pypa.io/)：`pipx install eleph`。
+
+## 可选的额外依赖
+
+有两组额外依赖，语言本身和验证器都不需要它们。
+
+| 额外依赖 | 增加 | 用于 |
+|---|---|---|
+| `claude` | `anthropic >= 0.40` | `eleph talk --claude` 所用的自然语言前端 |
+| `langchain` | `langchain`、`langchain-anthropic`、`langgraph`（都 `>= 1.0`） | `examples/langchain-agent` 里的智能体对照实验 |
+
+```bash
+uv pip install "eleph[claude]"
+uv pip install "eleph[langchain]"
+```
+
+## 确认它能跑
+
+写一个文件。九行就够拿到一份证明：
+
+```bash
+cat > airline.eleph <<'EOF'
+program airline
+
+event make_reservation(passenger, flight)
+event cancel_reservation(passenger, flight)
+
+fact has_reservation(P, F) := make_reservation(P, F) since_not cancel_reservation(P, F)
+
+on question(Caller, has_reservation(P, F)):
+    answer Caller with has_reservation(P, F)
+EOF
+
+eleph check airline.eleph
+```
+
+如果安装没问题，Z3 已经消解了那条义务，你会看到：
+
+```out
+airline.eleph  ->  programa airline
+2 eventos, 1 fato, 1 handler
+
+1 obrigacao derivada do texto do programa
+cada uma checada no seu limiar de completude (o maior: 3 eventos) -- exaustivo
+
+  ok  question(Caller, has_reservation)  linha 9  -  a resposta responde a pergunta feita
+
+PROVADO  -  1 obrigacao vale para TODO historico, de qualquer tamanho
+```
+
+<Callout type="danger" title="示例不在包里">
+`examples/` 和 `bench/` 下的任何东西都不会被 `pip install` 或 `uv add` 安装。只有
+`eleph` 包会：
+
+```bash
+$ find .venv -name "*.eleph"
+$                                   # 什么都没有
+```
+
+所以从 PyPI 安装之后运行 `eleph check examples/airline.eleph` 会失败，而且今天它失败时
+给的是 Python traceback 而不是一条消息。**本站每一个提到 `examples/` 下路径的页面，都
+默认你克隆了仓库。**
+</Callout>
+
+## 想跑示例，请克隆仓库
+
+快速上手、概念页面和命令行参考都引用了针对仓库中文件的运行结果。要复现它们：
+
+```bash
+git clone https://github.com/dev-isaacmello/eleph && cd eleph
+uv venv && uv pip install -e ".[dev]"
+source .venv/bin/activate
+
+eleph check examples/airline.eleph
+```
+
+```out
+examples/airline.eleph  ->  programa airline
+3 eventos, 1 fato, 1 handler
+
+2 obrigacoes derivadas do texto do programa
+cada uma checada no seu limiar de completude (o maior: 3 eventos) -- exaustivo
+
+  ok  question(Caller, has_reservation)  linha 16  -  resposta yes e verdadeira
+  ok  question(Caller, has_reservation)  linha 18  -  resposta no e verdadeira
+
+PROVADO  -  2 obrigacoes valem para TODO historico, de qualquer tamanho
+```
+
+τ-bench 审计还会在首次使用时下载约 6 MB 的已发表轨迹，没有网络时会干净地跳过。

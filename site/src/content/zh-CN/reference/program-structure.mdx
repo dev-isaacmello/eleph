@@ -1,0 +1,149 @@
+---
+title: 程序结构
+description: 四种顶层形式 —— program、sort、event、fact —— 以及回答问题和请求的处理器。
+---
+
+# 程序结构
+
+<p className="lede">
+一个文件声明一个程序、它谈论的对象种类、可能发生的事件、这些事件所确立的事实，以及那些
+会说话的处理器。缩进有意义，Python 风格，只能用空格。
+</p>
+
+## 一个文件的形状
+
+```eleph
+program airline
+
+sort Passenger
+sort Flight
+
+event make_reservation(p: Passenger, f: Flight)
+
+fact has_reservation(P: Passenger, F: Flight) :=
+    make_reservation(P, F) since_not cancel_reservation(P, F)
+
+on question(C, has_reservation(P, F)):
+    answer C with has_reservation(P, F)
+```
+
+`program` 必须排在最前。在它之后，`sort`、`event`、`fact` 和 `on` 可以任意顺序出现。
+注释从 `#` 到行尾。
+
+## `program`
+
+```eleph
+program companhia
+```
+
+每个文件一个，它给程序命名。这个名字会出现在验证器的抬头里。
+
+## `sort`
+
+```eleph
+sort Passenger
+sort Flight
+```
+
+sort 是一类对象。声明它们是可选的 —— `event make_reservation(passenger, flight)` 不带
+标注也能解析 —— 但 sort 做了两件值得要的事：
+
+* 让编译器能抓到放错位置的参数；
+* 限定验证器所量化的论域，这正是 `exists P: Sort where` 和 `count P: Sort where` 需要的。
+
+有两个内置 sort，不需要声明：
+
+| Sort | 用于 |
+|---|---|
+| `Party` | 谁在说话，或者话说给谁 |
+| `Number` | 事件的一个数值字段 |
+
+<Callout type="note" title="sort 的标签互不冲突">
+`Party` 和 `Passenger` 都以 `p` 开头。0.2.0 之前，这会让两个 sort 在打印出来的反例里
+无法区分。现在它们不再冲突。
+</Callout>
+
+## `event`
+
+```eleph
+event make_reservation(p: Passenger, f: Flight)
+event charged_while_active(u: User, c: Charge, amount: Number)
+event close_flight(f: Flight)
+```
+
+事件是可能发生的事情。参数写作 `名字: Sort`，标注是可选的。事件是**唯一的**真值来源：
+没有别的东西能让一条事实为真。
+
+无参事件是允许的 —— 写 `event tick` 或 `event tick()` 都行。
+
+## `fact`
+
+```eleph
+fact has_seat(P: Passenger, F: Flight) :=
+    assign_seat(P, F) since_not cancel_reservation(P, F)
+
+fact seats_left(F: Flight) :=
+    count P: Passenger where has_reservation(P, F) < 2
+
+fact flight_open(F: Flight) := not close_flight(F)
+```
+
+事实是一条**具名的时态表达式**，不是一个被存储的值。它的参数是逻辑变量，习惯上大写开头，
+它的主体是任意[时态表达式](/docs/reference/expressions)。事实可以引用其他事实。
+
+每一条被声明的事实都会做类型检查，无论有没有被调用。0.3.0 之前解析是惰性的，所以一条没有
+任何处理器提到的事实，根本不会被检查。
+
+<Callout type="limit">
+事实不能递归，所以传递性性质是够不到的。
+</Callout>
+
+## `on` —— 处理器
+
+```eleph
+on question(C, has_reservation(P, F)):
+    answer C with has_reservation(P, F)
+
+on request(C, make_reservation(P, F)):
+    if has_reservation(P, F):
+        decline C
+    else:
+        record make_reservation(P, F)
+        accept C
+        promise C that has_reservation(P, F)
+```
+
+有两种施为动词：
+
+| 施为动词 | 主体必须 | 用什么回应 |
+|---|---|---|
+| `question` | 在每条路径上恰好回答一次 | `answer C yes` / `no` / `with φ` |
+| `request` | 在每条路径上恰好接受或拒绝一次 | `accept C` / `decline C` |
+
+第一个参数绑定来电者。第二个是主题：`request` 用事件，`question` 用事实。主题里的变量在
+整个主体中都是绑定的。
+
+「在每条路径上恰好一次」是一条[结构性义务](/docs/concepts/obligations) —— 一条什么都不说
+的分支，或者说了两件事的分支，都是缺陷。
+
+### 用权限把守
+
+```eleph
+on question(Quem, saldo(C)) permitted pode_perguntar(Quem, C):
+    answer Quem with saldo(C)
+```
+
+`permitted` 接收一条事实，并进入从该处理器推导出的每一条义务的路径条件。见
+[权限](/docs/concepts/permission)。
+
+## 词法规则
+
+* **空格，绝不用制表符。** 缩进里出现制表符是错误，而且有专门的报错：`use espacos, nao
+  tabs, para indentar`。
+* **缩进必须一致。** 减少缩进时必须回到某个曾经打开过的层级。
+* 标识符是 `[A-Za-z_][A-Za-z_0-9]*`。大小写承载约定但不承载语义：sort 和逻辑变量大写开头，
+  事件和事实不是。
+* 数字是非负整数。
+* 比较运算符是 `>=`、`<=`、`==`、`!=`、`<`、`>`。定义符是 `:=`。
+
+完整的关键字列表在 <Source file="eleph/lexer.py" />，文法在[文法页](/docs/reference/grammar)。

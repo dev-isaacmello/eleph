@@ -1,0 +1,137 @@
+---
+title: 时态表达式
+description: 每一个读取过去的算子 —— 原子、since_not、count、量词、spoke、数值字段 —— 以及它们各自向历史提出的问题。
+---
+
+# 时态表达式
+
+<p className="lede">
+一个程序所能知道的一切，都是一条关于它自己日志的公式。以下是这条公式可以采取的形式。
+</p>
+
+## 那张表
+
+| 形式 | 含义 |
+|---|---|
+| `e(a, b)` | 事件 `e` 在过去**至少发生过一次** |
+| `a since_not b` | `a` 发生过，且此后没有 `b` 发生 |
+| `count e(a) >= n` | `e` 发生了多少次 |
+| `exists P: Sort where φ` | 现在存在某个对象满足 φ |
+| `count P: Sort where φ >= n` | 有多少个满足，这正是座位上限需要的 |
+| `spoke accept to C about e(...)` | 程序在那次交流中执行过那个行为 |
+| `e(a, amount > 100)` | 事件的一个数值字段，在它发生的那一刻被检验 |
+| `not`、`and`、`or` | 一如往常 |
+
+括号用于分组。`not` 结合最紧，然后是 `since_not`，然后是 `and`，然后是 `or`。
+
+## 原子：有意留下的陷阱
+
+```eleph
+make_reservation(P, F)
+```
+
+一个裸的事件原子表示*这件事在过去至少发生过一次*。它读起来像「持有」，含义却是「订过」。
+两者一直吻合，直到第一次取消，之后就再也不吻合。
+
+<Callout type="danger" title="这是这门语言唯一一个刻意的陷阱">
+裸的 `e(a, b)` 被保留下来，因为它正是真实系统会犯的错误。验证器是用来区分这两者的 ——
+见 [McCarthy 的 bug](/docs/the-mccarthy-bug)。
+</Callout>
+
+## `since_not`
+
+```eleph
+make_reservation(P, F) since_not cancel_reservation(P, F)
+```
+
+准确地说：*在最后一个 `b` 之后存在一个 `a`*。正是这个算子让一条事实表现得像一个可变字段，
+而它并不是。
+
+```eleph
+fact active(U: User) := subscribed(U) since_not cancelled(U)
+fact flight_open(F: Flight) := not close_flight(F)
+```
+
+它的操作数是**原子**，这是线性[完备性阈值](/docs/concepts/completeness)的前提。`since_not`
+之下的复合表达式仍然可以验证，只是要用监视器状态空间那个界。
+
+## 对出现次数的 `count`
+
+```eleph
+count make_reservation(P, F) >= 8
+```
+
+这个原子出现了多少次。可以用 `>=`、`<=`、`==`、`!=`、`<`、`>` 中任意一个，对一个非负整数
+比较。
+
+这个常数关乎代价：要证明关于 180 这个容量的性质，需要能容纳 180 个事件的历史。
+
+## 量词
+
+```eleph
+exists P: Passenger where has_reservation(P, F)
+
+fact seats_left(F: Flight) := count P: Passenger where has_reservation(P, F) < 2
+```
+
+`exists` 问的是现在**是否存在**该 sort 的某个对象满足主体。`count … where` 问的是有多少个
+满足，这正是容量上限需要的 —— 这是 McCarthy 自己的例子，而且没有量化就无法表达。
+
+验证器会限定论域：一个在历史中从未出现的对象，会让每一个指名它的原子为假，所以对出现过的
+对象做量化，与对一个无界论域做量化是一回事。
+
+## `spoke`
+
+```eleph
+if spoke accept to C about make_reservation(P, F):
+    decline C
+```
+
+程序自己说的话是同一份日志里的事件，所以可以问它已经说过什么。可记录的施为动词是：
+
+`answer` · `accept` · `decline` · `promise` · `ask`
+
+<Callout type="limit">
+`spoke` 指称的是**那次交流和那个行为**，不是命题内容。*「我是不是已经承诺过这一件具体的
+事？」*无法表达。*「我是不是已经在这里承诺过什么？」*可以。
+</Callout>
+
+## 数值字段
+
+```eleph
+event charged_while_active(u: User, c: Charge, amount: Number)
+
+fact refundable(U: User, C: Charge) :=
+    charged_after_cancelling(U, C, amount > 0) since_not refunded(U, C)
+
+fact within_limit(U: User, C: Charge) :=
+    charged_after_cancelling(U, C, amount <= 200) since_not refunded(U, C)
+```
+
+参数位置上的比较会约束该事件的一个数值字段。这个比较是**原子身份的一部分**，而不是一条
+可能在底下移动的独立事实，正是这一点让完备性论证得以保持。
+
+<Callout type="limit" title="在事件发生的那一刻比较">
+你可以问*这一笔费用*是否超过 100。你不能问最近三笔之和是否超过。历史上的聚合运算无法表达。
+</Callout>
+
+## 布尔
+
+```eleph
+not close_flight(F)
+has_reservation(P, F) and flight_open(F)
+refundable(U, C) and not within_limit(U, C)
+```
+
+`yes` 和 `no` 在表达式里也是字面量，所以 `answer C with yes` 能解析，含义是那个常量。
+
+## 事实可以组合
+
+一条事实可以引用任何其他事实，而这正是构建一份策略的预期方式：
+
+```eleph
+fact may_refund(U: User, C: Charge)        := refundable(U, C) and within_limit(U, C)
+fact needs_escalation(U: User, C: Charge)  := refundable(U, C) and not within_limit(U, C)
+```
+
+这两条在 <Source file="examples/langchain-agent/policy.eleph" /> 里都对所有历史被证明过。

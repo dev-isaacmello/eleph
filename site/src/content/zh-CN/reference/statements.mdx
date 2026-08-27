@@ -1,0 +1,130 @@
+---
+title: 语句
+description: 处理器主体里能做的一切 —— answer、record、accept、decline、promise、offer、release，以及 if/else。
+---
+
+# 语句
+
+<p className="lede">
+处理器的主体是一串语句。它们中的每一个，要么是一个言语行为，要么是对发生过的事情的一次
+记录，要么是一个分支。
+</p>
+
+## 完整清单
+
+| 语句 | 作用 |
+|---|---|
+| `answer C yes` | 断言主题成立 |
+| `answer C no` | 断言主题不成立 |
+| `answer C with φ` | 按日志说的那样回答 |
+| `record e(...)` | 某件事发生了；把它追加到日志 |
+| `accept C` | 接受一个请求 |
+| `decline C` | 拒绝一个请求 |
+| `offer C that φ` | 有意愿，尚未负债 |
+| `promise C that φ` | φ 现在为真 |
+| `promise C eventually φ` | φ 将在某个时刻成立 |
+| `promise C that φ before e(...)` | φ 将在 `e` 发生之前成立 |
+| `release C from φ` | 免除程序的一笔债务 |
+| `if φ: … else: …` | 基于过去分支 |
+
+## `answer`
+
+```eleph
+on question(C, has_reservation(P, F)):
+    if has_reservation(P, F):
+        answer C yes
+    else:
+        answer C no
+```
+
+或者，等价而且不会写错的写法：
+
+```eleph
+on question(C, has_reservation(P, F)):
+    answer C with has_reservation(P, F)
+```
+
+`answer C with φ` 是不可能写错的那种形式：它按日志说的那样回答。而那些字面形式正是让
+[McCarthy 的 bug](/docs/the-mccarthy-bug) 可以被表达、因而也可以被抓住的东西。
+
+`question` 处理器的每条路径都必须**恰好回答一次**。缺一个回答和回答两次，都是结构性缺陷。
+
+## `record`
+
+```eleph
+record make_reservation(P, F)
+```
+
+任何东西成为真的唯一途径。处理器内部的顺序很重要：一条即时承诺是基于日志*加上*同一主体里
+它之前所记录的内容来消解的。
+
+## `accept` 与 `decline`
+
+```eleph
+on request(C, make_reservation(P, F)):
+    if has_reservation(P, F):
+        decline C
+    else:
+        record make_reservation(P, F)
+        accept C
+```
+
+`request` 处理器的每条路径都必须**恰好接受或拒绝一次**。
+
+两者都接受一个可选的显式主题 —— `accept C make_reservation(P, F)` —— 用于处理器关于一件
+事、而回应关于另一件事的场合。
+
+## 四种承诺
+
+```eleph
+offer    C that φ
+promise  C that φ
+promise  C eventually φ
+promise  C that φ before e(...)
+```
+
+每一种携带不同的义务。完整讲解连同账本，在[承诺页](/docs/concepts/commitments)。
+
+```eleph
+on request(C, make_reservation(P, F)):
+    if has_reservation(P, F):
+        decline C
+    else:
+        if seats_left(F) and flight_open(F):
+            record make_reservation(P, F)
+            accept C
+            promise C that has_reservation(P, F)
+            promise C that has_seat(P, F) before board(P, F)
+        else:
+            decline C
+```
+
+## `release`
+
+```eleph
+release C from has_seat(P, F)
+```
+
+免除程序一笔它已经无法兑现的债务 —— 比如在一次取消之后。它是一个言语行为，也进日志：一笔
+被悄悄放下的债务，和一笔被正式解除的债务，是两段不同的历史。
+
+## `if` / `else`
+
+```eleph
+if seats_left(F) and flight_open(F):
+    ...
+else:
+    ...
+```
+
+条件是任意[时态表达式](/docs/reference/expressions)。所走的分支成为从其中语句推导出的每一
+条义务的**路径条件** —— 那就是验证器打印的 `supondo` 那一行。
+
+`else` 是可选的，但在 `question` 或 `request` 处理器里省掉它，通常会造出一条什么都不说的
+路径，那是结构性缺陷。验证器会告诉你。
+
+## 这里没有的东西
+
+没有赋值，没有循环，没有函数调用，没有变量。这不是为了简单而选出的子集；这就是
+[设计](/docs/concepts/past-is-state)。过去就是状态，所以没有东西可以被赋值；处理器每次
+发言运行一次，所以没有东西需要循环。

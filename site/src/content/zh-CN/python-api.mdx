@@ -1,0 +1,251 @@
+---
+title: Python API
+description: Policy、Guard 与三种集成形态 —— observer、guard、language —— 以及完整的方法参考。
+---
+
+# Python API
+
+<p className="lede">
+语言是研究产物。大多数系统需要的东西更小，而它以库的形式发布：一个观察发生过什么、告诉你
+其中什么为真、拒绝让你断言不为真的东西、并记住你承诺过什么的东西。
+</p>
+
+```python
+from eleph import Policy
+
+policy = Policy.from_file("booking.eleph")
+assert policy.verify().proved          # 同一个文件，已被静态证明
+
+g = policy.guard(log="booking.jsonl")  # 持久化，重新打开会重放
+
+g.record("make_reservation", "alice", "ba117")
+g.holds("has_reservation", "alice", "ba117")                  # True
+g.assert_answer("has_reservation", False, "alice", "ba117")   # 抛出异常
+
+g.promise("alice", "has_seat", "alice", "ba117",
+          before=("board", ("alice", "ba117")))
+g.outstanding()        # 还欠着什么，欠谁
+```
+
+<Callout type="note" title="这一页是参考">
+关于怎么把它接进你已经在跑的智能体 —— 用 GPT-4 或别的什么 —— 请从
+[用在你的智能体上](/docs/use/start-here)开始。这一页是你已经知道要找什么之后才翻的。
+</Callout>
+
+## 三种形态，由轻到重
+
+| 形态 | 你需要改什么 | 你得到什么 |
+|---|---|---|
+| **observer** | 什么都不改，你只负责把事件喂给它 | 记录中什么为真，以及一份审计 |
+| **guard** | 断言和工具调用都经由它路由 | 没有依据的主张会抛出异常，而不是被发出去 |
+| **language** | 用 `.eleph` 编写处理器 | 静态证明 |
+
+`python examples/agente.py` 会拿 <Source file="examples/companhia.eleph" /> 把三种都跑
+一遍。
+
+<Callout type="proved" title="为什么用策略文件，而不是在 Python 里写检查">
+**你的守卫在凌晨三点执行的规则，和求解器证明过的是同一份产物。** 规则被证明过的守卫，和
+规则只是被某人相信的守卫，是两回事。
+</Callout>
+
+## `Policy`
+
+一份被解析的策略：一个系统愿意为之负责的那些事实。
+
+```python
+from eleph import Policy
+
+policy = Policy("program p\nevent e(x)\nfact f(X) := e(X)\n")
+policy = Policy.from_file("booking.eleph")
+```
+
+| 成员 | 返回 | 说明 |
+|---|---|---|
+| `Policy(source)` | | 从字符串解析一份策略 |
+| `Policy.from_file(path)` | `Policy` | 从磁盘解析一份策略 |
+| `.verify(bound=None, objects=None)` | `VerifyReport` | 对这份策略自己的处理器运行静态验证器 |
+| `.guard(log=None, audit=False)` | `Guard` | 对某一段历史的实时视图 |
+| `.facts()` | `list[str]` | 已声明的事实名 |
+| `.events()` | `list[str]` | 已声明的事件名，不含合成的言语事件 |
+| `.program` | AST | 解析后的程序 |
+| `.source` | `str` | 它是从哪段文本解析出来的 |
+
+## `VerifyReport`
+
+```python
+report = policy.verify()
+
+report.proved      # 每条义务对所有历史都成立时为 True
+report.failures    # 没有成立的那些结果
+report.structural  # 结构性缺陷，如果有的话
+report.results     # 全部结果
+print(report.summary())
+```
+
+只有在**没有结构性缺陷**、并且每一条结果都在它的完备性阈值处被消解时，`proved` 才是
+`True`。一份没有反例但运行不穷尽的报告不算 `proved`，而 `summary()` 会说明你处在哪种
+情况：
+
+```text
+6 obrigacoes provadas para todo historico
+2 de 6 obrigacoes nao se sustentam
+1 defeito(s) estrutural(is)
+6 obrigacoes sem contraexemplo, nao exaustivo
+```
+
+## `Guard`
+
+对某一段历史的实时视图：什么为真，以及欠着什么。
+
+```python
+g = policy.guard(log="booking.jsonl", audit=False)
+```
+
+| 参数 | 作用 |
+|---|---|
+| `log` | 一份只追加的 JSONL 历史的路径。重新打开会重放 |
+| `audit` | 用**两种方式**回答每一次查询 —— 走索引，以及重读日志 —— 一旦不一致就抛出异常 |
+
+### 历史
+
+```python
+g.record("make_reservation", "alice", "ba117")
+g.events        # tuple[Event, ...]  外部世界的事件，不含言语
+```
+
+如果事件没有被声明或者元数不对，`record` 会抛出 `UnknownName`。它是任何东西成为真的唯一
+途径。
+
+### 真值
+
+```python
+g.holds("has_reservation", "alice", "ba117")        # -> bool
+g.require("has_reservation", "alice", "ba117")      # 不成立就抛 Ungrounded
+g.assert_answer("has_reservation", True, "alice", "ba117")
+```
+
+| 方法 | 用来 |
+|---|---|
+| `holds(fact, *args)` | 询问记录中什么为真 |
+| `require(fact, *args)` | 用一个前置条件把守一次工具调用 |
+| `assert_answer(fact, value, *args)` | 直接可用的回答公理：只说事情本来的样子 |
+
+`assert_answer` 就是那个阻止模型把没有依据的主张发出去的东西：
+
+```python
+try:
+    g.assert_answer("has_reservation", model_said_yes, "alice", "ba117")
+except Ungrounded as e:
+    ...   # e: tentou afirmar has_reservation(alice, ba117) = True
+          #    quando o log diz False
+```
+
+### 承诺
+
+```python
+g.promise("alice", "has_seat", "alice", "ba117")                       # eventually
+g.promise("alice", "has_seat", "alice", "ba117",
+          before=("board", ("alice", "ba117")))                        # 在某事件之前
+
+g.release("alice", "has_seat", "alice", "ba117")
+
+g.outstanding()   # list[Commitment]  还欠着的
+g.breached()      # list[Commitment]  没有兑现的
+g.ledger          # list[Commitment]  每一条承诺，带状态
+print(g.report())
+```
+
+承诺会作为事件写入日志。它是被兑现、被违背还是被解除，**取决于它之后发生的那些事件**，
+所以是在重放时重新算出来的，而不是被存储的。
+
+## 异常
+
+| 异常 | 何时抛出 |
+|---|---|
+| `Ungrounded` | 你断言或要求了历史所不支持的东西 |
+| `UnknownName` | 你指名了策略没有声明的事件或事实，或者元数写错了 |
+| `NotPermitted` | 某个处理器的 `permitted` 事实对这个来电者不成立 |
+| `Refusal` | 基类；运行时拒绝了一个言语行为 |
+
+`Ungrounded` 继承自 `Refusal`，所以 `except Refusal` 两者都能接住。
+
+## 三种形态的代码
+
+### 1. observer —— 什么都不改
+
+```python
+g = policy.guard()
+
+for event in [("make_reservation", "alice", "ba117"),
+              ("make_reservation", "bruno", "ba117"),
+              ("cancel_reservation", "alice", "ba117")]:
+    g.record(*event)
+
+g.holds("has_reservation", "alice", "ba117")   # False
+g.holds("has_reservation", "bruno", "ba117")   # True
+g.holds("seats_left", "ba117")                 # True
+```
+
+什么都不可能被弄坏，因为还没有强制执行任何东西。[τ-bench 审计](/docs/taubench)就是这样在
+别人的轨迹上工作的。
+
+### 2. guard —— 模型提议，日志裁决
+
+```python
+def answer(question, model_said, fact, *args):
+    try:
+        g.assert_answer(fact, model_said, *args)
+        return "是" if model_said else "否"
+    except Ungrounded as e:
+        return f"被拒绝：{e}"
+
+def run_tool(tool, precondition, *args):
+    g.require(precondition, *args)   # 抛出异常，而不是继续
+    g.record(tool, *args)
+```
+
+### 3. 账本 —— 熬过进程本身
+
+```python
+g = policy.guard(log=log)
+g.record("make_reservation", "bruno", "lh42")
+g.promise("bruno", "has_seat", "bruno", "lh42",
+          before=("board", ("bruno", "lh42")))
+
+g.record("board", "bruno", "lh42")     # 没有座位就登机了
+g.machine.store.close()
+
+# -- 进程在这里死掉 --
+
+revived = policy.guard(log=log)
+print(revived.report())                # 那次违背仍然在
+```
+
+除了事件什么都没有被保存。账本是推导出来的。
+
+## 更底层
+
+还有两样东西被导出，供 `Guard` 这种形态不合适时使用。
+
+```python
+from eleph import Machine, Store, Event, Commitment
+```
+
+| 对象 | 是什么 |
+|---|---|
+| `Machine(program, audit=False)` | 运行时本身：日志、索引、账本、对话记录 |
+| `Store(path, fsync=False)` | 只追加的 JSONL 日志。`fsync=True` 提供每事件级别的持久性，代价约 100 倍 |
+| `Event(name, args)` | 一个不可变事件 |
+| `Commitment` | 一笔债务，带 `party`、`mode`、`deadline`、`status` |
+
+```python
+m = Machine(policy.program, audit=True).attach(Store("log.jsonl"))
+m.log            # 每一个事件，含言语
+m.transcript     # 人可读的那段交流
+m.outstanding()  # list[Commitment]
+```
+
+<Callout type="note" title="线程安全">
+并发写入者会围绕索引被串行化。以 `fsync=True` 打开的 `Store` 会在每个事件上直写；默认是
+批量的，而那是正确的选择，除非丢掉尾部比慢一百倍更糟。
+</Callout>

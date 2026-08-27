@@ -6,7 +6,7 @@
  * it is translated and switching language can keep you where you were.
  */
 
-export type Locale = 'en' | 'pt-BR'
+export type Locale = 'en' | 'pt-BR' | 'zh-CN'
 
 export const DEFAULT_LOCALE: Locale = 'en'
 
@@ -21,6 +21,7 @@ export interface LocaleInfo {
 export const LOCALES: LocaleInfo[] = [
   { code: 'en', label: 'English', htmlLang: 'en' },
   { code: 'pt-BR', label: 'Português', htmlLang: 'pt-BR' },
+  { code: 'zh-CN', label: '中文', htmlLang: 'zh-Hans' },
 ]
 
 /**
@@ -33,11 +34,6 @@ export const README_TRANSLATIONS = [
     code: 'es',
     label: 'Español',
     href: 'https://github.com/dev-isaacmello/eleph/blob/main/docs/README.es.md',
-  },
-  {
-    code: 'zh-CN',
-    label: '中文',
-    href: 'https://github.com/dev-isaacmello/eleph/blob/main/docs/README.zh-CN.md',
   },
 ]
 
@@ -186,6 +182,44 @@ const TITLES: Record<Locale, { groups: Record<string, string>; pages: Record<str
       '/docs/limits': 'Limites honestos',
       '/docs/changelog': 'Changelog',
       '/docs/contributing': 'Contribuir',
+    },
+  },
+  'zh-CN': {
+    groups: {
+      use: '用在你的智能体上',
+      intro: '介绍',
+      concepts: '概念',
+      reference: '语言参考',
+      tooling: '工具',
+      practice: '实践',
+      project: '项目',
+    },
+    pages: {
+      '/docs/use/start-here': '从这里开始',
+      '/docs/use/any-model': '任何模型，任何框架',
+      '/docs/use/modelling': '为你的领域建模',
+      '/docs': 'eleph 是什么',
+      '/docs/installation': '安装',
+      '/docs/quickstart': '快速上手',
+      '/docs/the-mccarthy-bug': 'McCarthy 的 bug',
+      '/docs/concepts/past-is-state': '过去是唯一的状态',
+      '/docs/concepts/obligations': '义务，推导而来',
+      '/docs/concepts/completeness': '证明，而非抽查',
+      '/docs/concepts/commitments': '承诺',
+      '/docs/concepts/permission': '权限',
+      '/docs/reference/program-structure': '程序结构',
+      '/docs/reference/expressions': '时态表达式',
+      '/docs/reference/statements': '语句',
+      '/docs/reference/obligations': '推导出的义务',
+      '/docs/reference/grammar': '文法',
+      '/docs/cli': '命令行',
+      '/docs/python-api': 'Python API',
+      '/docs/integration/langchain': 'LangChain 智能体',
+      '/docs/performance': '性能',
+      '/docs/taubench': 'τ-bench 审计',
+      '/docs/limits': '诚实的局限',
+      '/docs/changelog': '更新日志',
+      '/docs/contributing': '参与贡献',
     },
   },
 }

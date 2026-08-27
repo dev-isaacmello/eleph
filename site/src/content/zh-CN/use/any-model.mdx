@@ -1,0 +1,304 @@
+---
+title: 任何模型，任何框架
+description: 守卫里没有任何东西知道 LLM 是什么。OpenAI SDK、裸工具循环和 LangChain 的完整示例。
+---
+
+# 任何模型，任何框架
+
+<p className="lede">
+本仓库里的完整示例用的是 LangChain 和 Claude，那纯粹是因为手边有这两个。一个
+<code>Guard</code> 就是在读一份只追加列表的 Python 代码：它不发起模型调用，不发起
+网络调用，也不关心它正在检查的文本是哪个厂商产生的。
+</p>
+
+<Callout type="note" title="守卫引入了什么">
+`eleph.guard` 引入 `json`、`pathlib`、`dataclasses`、`typing` 和 `eleph` 的其余部分。
+这条路径上任何地方都没有 HTTP 客户端。GPT-4、Claude、Gemini、Llama、你自己的微调模型，
+或者一台手写的状态机：集成方式完全相同。
+</Callout>
+
+## 守卫放在哪里
+
+两个地方，只有两个。
+
+```text
+                  model proposes                    guard decides
+  ┌──────────┐   ─────────────────▶   ┌─────────┐  ────────────────▶  ┌────────┐
+  │  your    │                        │  your   │   require(...)      │  your  │
+  │  LLM     │                        │  code   │   assert_answer()   │ backend│
+  └──────────┘   ◀─────────────────   └─────────┘  ◀────────────────  └────────┘
+                  tool result                       record(...)
+```
+
+**在工具运行之前**，对前置条件调用 `require`。**在断言发出去之前**，用
+`assert_answer` 检查它。其余的都是你已有的管道。
+
+## 策略
+
+一个文件，在任何智能体碰它之前就已被证明。
+
+<Snippet title="support.eleph">
+```eleph
+program support
+
+sort User
+sort Charge
+
+event authenticated(who: Party, u: User)
+event logged_out(who: Party, u: User)
+
+event subscribed(u: User)
+event cancelled(u: User)
+event refunded(u: User, c: Charge)
+event statement_closed(u: User)
+
+event charged_while_active(u: User, c: Charge, amount: Number)
+event charged_after_cancelling(u: User, c: Charge, amount: Number)
+
+fact authorised(Q: Party, U: User) := authenticated(Q, U) since_not logged_out(Q, U)
+fact active(U: User) := subscribed(U) since_not cancelled(U)
+fact refundable(U: User, C: Charge) := charged_after_cancelling(U, C, amount > 0) since_not refunded(U, C)
+fact within_limit(U: User, C: Charge) := charged_after_cancelling(U, C, amount <= 200) since_not refunded(U, C)
+fact may_refund(U: User, C: Charge) := refundable(U, C) and within_limit(U, C)
+
+on question(Who, active(U)) permitted authorised(Who, U):
+    answer Who with active(U)
+
+on question(Who, may_refund(U, C)) permitted authorised(Who, U):
+    answer Who with may_refund(U, C)
+```
+</Snippet>
+
+```out
+$ eleph check support.eleph
+
+support.eleph  ->  programa support
+8 eventos, 5 fatos, 2 handlers
+
+2 obrigacoes derivadas do texto do programa
+cada uma checada no seu limiar de completude (o maior: 6 eventos) -- exaustivo
+
+  ok  question(Who, active)  linha 30  -  a resposta responde a pergunta feita
+  ok  question(Who, may_refund)  linha 33  -  a resposta responde a pergunta feita
+
+PROVADO  -  2 obrigacoes valem para TODO historico, de qualquer tamanho
+```
+
+## 它拒绝了什么
+
+这是一次真实的运行，里面完全没有模型。这四个提案就是 LangChain 对照实验发现的那四个
+失败，只是去掉了模型和框架。
+
+```python
+from eleph import Policy, Ungrounded
+
+policy = Policy.from_file("support.eleph")
+print("static check:", policy.verify().summary())
+
+g = policy.guard()
+
+# 你的系统已经知道的事情。真实集成里，这些是随着发生而被记录的。
+g.record("subscribed", "ana")
+g.record("charged_while_active", "ana", "c1", "150")
+g.record("authenticated", "session-42", "ana")
+
+# 1. 客户的错误前提：「我上个月取消了，给我退款」
+g.require("refundable", "ana", "c1")
+
+# 2. 模型断言了日志所否定的事情
+g.assert_answer("active", False, "ana")
+
+# 3. 别人的账户
+g.require("authorised", "session-42", "bruno")
+```
+
+```out
+static check: 2 obrigacoes provadas para todo historico
+
+-- 1. the customer's false premise --
+   REFUSED: o log nao sustenta refundable(ana, c1)
+
+-- 2. the model asserts something the log denies --
+   REFUSED: tentou afirmar active(ana) = False quando o log diz True
+
+-- 3. someone else's account --
+   REFUSED: o log nao sustenta authorised(session-42, bruno)
+```
+
+以及那个合法案例所产生的承诺：
+
+```python
+g.record("cancelled", "ana")
+g.record("charged_after_cancelling", "ana", "c2", "80")
+g.require("may_refund", "ana", "c2")          # 通过：已取消、未结、低于 200
+
+# 智能体说「您的退款已在路上」。那是一笔债务，在账单结清之前到期。
+g.promise("ana", "refunded", "ana", "c2",
+          before=("statement_closed", ("ana",)))
+
+g.record("statement_closed", "ana")           # 而没有人退款
+```
+
+```out
+-- 4. a legitimate refund, and the promise it creates --
+   outstanding: 1
+
+-- 5. the statement closes and nobody refunded --
+   BREACHED  a ana: alguma vez refunded(ana, c2) (antes de statement_closed(ana))
+   outstanding: 0, breached: 1
+```
+
+最后那一段属于任何输出过滤器都看不见的那一类：智能体说它会做，然后没做。
+
+## 用 OpenAI SDK
+
+守卫还是那四个调用。变的只是它周围的管道。
+
+```python
+import json
+from openai import OpenAI
+from eleph import Policy, Ungrounded
+
+client = OpenAI()
+guard = Policy.from_file("support.eleph").guard(log="support.jsonl")
+
+TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "issue_refund",
+            "description": "为客户退一笔款。",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "user": {"type": "string"},
+                    "charge_id": {"type": "string"},
+                },
+                "required": ["user", "charge_id"],
+            },
+        },
+    }
+]
+
+
+def issue_refund(session: str, user: str, charge_id: str) -> str:
+    """模型可以调用的工具。是否运行由守卫决定。"""
+    try:
+        guard.require("authorised", session, user)     # 这个来电者是否有资格
+        guard.require("may_refund", user, charge_id)   # 记录是否支持这次退款
+    except Ungrounded as e:
+        return f"被策略拒绝：{e}"
+
+    backend.refund(user, charge_id)                    # 你已有的代码
+
+    guard.record("refunded", user, charge_id)
+    guard.promise(user, "refunded", user, charge_id,
+                  before=("statement_closed", (user,)))
+    return "退款已发出"
+
+
+def turn(session: str, messages):
+    reply = client.chat.completions.create(
+        model="gpt-4o", messages=messages, tools=TOOLS
+    )
+    message = reply.choices[0].message
+
+    for call in message.tool_calls or []:
+        args = json.loads(call.function.arguments)
+        if call.function.name == "issue_refund":
+            result = issue_refund(session, args["user"], args["charge_id"])
+            messages.append(
+                {"role": "tool", "tool_call_id": call.id, "content": result}
+            )
+    return message
+```
+
+<Callout type="danger" title="是会话决定谁在说话，绝不是消息">
+`session` 来自你的认证层，由外部传入。它绝不能是一个由模型填写的工具参数，否则你就是在
+问模型「你在替谁说话」，而它可以答错。这正是对照实验中 0/5 全败的那个案例。
+</Callout>
+
+还有两个承重的细节：
+
+**拒绝是一个工具返回值，不是一个终止本轮的异常。** 把那个字符串交回给模型，它就能向客户
+解释这次拒绝，这正是你要的。你绝不能做的，是让它重试同一个调用并成功。
+
+**读取也算一次操作。** 信息泄露不会在你的数据库里留下痕迹，所以一套只对写入打分的测试会
+把一次泄露判为干净的运行。泄露就是这样上线的。
+
+## 用裸工具循环
+
+完全不用框架。还是那四个调用。
+
+```python
+def run_tool(session, name, args):
+    spec = GUARDED[name]                     # {"tool": fn, "requires": [...]}
+    try:
+        for fact, *fact_args in spec["requires"]:
+            guard.require(fact, *[args[a] for a in fact_args])
+    except Ungrounded as e:
+        return f"被策略拒绝：{e}"
+
+    out = spec["tool"](**args)
+    for event, *event_args in spec["records"]:
+        guard.record(event, *[args[a] for a in event_args])
+    return out
+```
+
+## 用 LangChain
+
+```python
+from langchain_core.tools import tool
+
+@tool
+def issue_refund(user: str, charge_id: str) -> str:
+    """为客户退一笔款。"""
+    try:
+        guard.require("may_refund", user, charge_id)
+    except Ungrounded:
+        return "被策略拒绝：记录不支持这次退款。"
+    out = backend.refund(user, charge_id)
+    guard.record("refunded", user, charge_id)
+    guard.promise(user, "refunded", user, charge_id,
+                  before=("statement_closed", (user,)))
+    return out
+```
+
+完整版本 —— 在九个场景上分别以带守卫和不带守卫运行 —— 在
+<Source file="examples/langchain-agent" />。
+
+## 检查模型说的话，而不只是它做的事
+
+工具调用是容易的那一半。另一半是智能体*说*了什么：
+
+```python
+def answer_about_account(session, user, model_said_active: bool) -> str:
+    guard.require("authorised", session, user)          # 是否有资格发问
+    guard.assert_answer("active", model_said_active, user)
+    return "是" if model_said_active else "否"
+```
+
+当模型的是或否与日志相悖时，`assert_answer` 会抛出 `Ungrounded`。这就是 McCarthy 的
+第一条公理，可以直接使用：**只说事情本来的样子。**
+
+## 持久化
+
+```python
+guard = policy.guard(log="support.jsonl")
+```
+
+写入的只有事件。索引和承诺账本是通过重放它们而重建的，因此一个崩溃后重启的进程与一个
+从未崩溃的进程无从区分，而末尾被截断的一行会被丢弃，而不是去猜。见[过去是唯一的
+状态](/docs/concepts/past-is-state)。
+
+## 接下来
+
+<Steps>
+<li>
+[**为你的领域建模**](/docs/use/modelling) —— 真正需要新思考的那一部分：把你已有的表
+变成事件和事实。
+</li>
+<li>
+[**Python API**](/docs/python-api) —— 每一个方法，每一个异常。
+</li>
+</Steps>

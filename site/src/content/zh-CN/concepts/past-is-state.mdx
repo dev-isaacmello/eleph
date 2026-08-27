@@ -1,0 +1,81 @@
+---
+title: 过去是唯一的状态
+description: eleph 的文法里没有赋值。事实不是被存储的，它是对发生过的事情的一次查询。
+---
+
+# 过去是唯一的状态
+
+<p className="lede">
+文法里没有赋值。这不是遗漏。没有东西可以被赋值，因为事实不是被存储的 —— 它是对发生过的
+事情的一次查询。
+</p>
+
+## 事实是一条公式
+
+```eleph
+fact has_reservation(P: Passenger, F: Flight) :=
+    make_reservation(P, F) since_not cancel_reservation(P, F)
+```
+
+`has_reservation` 不是一列、一个缓存，也不是某个对象上的字段。它是这样一句话：*「在最后
+一次 `cancel_reservation` 之后存在一次 `make_reservation`」*，每当有人发问时就对着日志
+求值一遍。
+
+没有东西会被覆盖，所以没有东西会与事实脱节。那个经典的失败 —— 一个有人忘了清的布尔标志
+—— 在这里根本没有可以栖身的形状。
+
+## 程序说的每一句话也是事件
+
+程序自己说的话和外部世界的事件进的是同一份日志，所以可以问它已经说过什么：
+
+```eleph
+if spoke accept to C about make_reservation(P, F):
+    decline C
+```
+
+这就是为什么 `eleph check` 打印的反例里会出现
+`disse-ask-sobre-has_reservation(Caller, P, F)` 这样的行。一个问题被问了，所以「问」这件
+事发生了，所以它在历史里。
+
+`spoke` 指称的是那次交流和那个行为，不是命题内容 —— 关于这一点它究竟允许和不允许问什么，
+见[局限](/docs/limits)。
+
+## 你放弃的东西由什么取代
+
+| 你本来会写 | 你改成写 |
+|---|---|
+| `user.active = False` | `record cancelled(u)` |
+| `if user.active:` | `if subscribed(U) since_not cancelled(U):` |
+| 一张 `reservations` 表 | `count P: Passenger where has_reservation(P, F)` |
+| 一列 `promised_at` | `promise C that φ before e(...)`，然后去读账本 |
+| 状态旁边的一份审计日志 | 只有日志；状态是推导出来的 |
+
+最后一行改变了人们如何论证一个系统。在寻常的设计里，审计日志是第二份产物，理应与第一份
+一致。这里没有第一份。
+
+## 持久化是白送的
+
+写入磁盘的只有事件。索引和承诺账本是通过重新经历一遍过去而重建的，因此一个崩溃后重启的
+进程与一个从未崩溃的进程无从区分。
+
+```python
+g = policy.guard(log="booking.jsonl")   # 重新打开会重放
+```
+
+末尾被截断的一行会被丢弃：一个还没写完的事件，就是一个没有发生过的事件。
+
+## 那个反对意见，以及回应
+
+如果唯一的状态是过去，那么回答一个问题就意味着读一遍过去，而那是平方复杂度的。这一点确实
+显现过：在四千次交互时，早期版本跑到每秒 46 个事件。
+
+回应是：这里每一个算子都有一步递推，而一条引理让它变得锋利 —— *一个与某子公式的任何原子
+都不匹配的事件，无法改变该子公式的值*。折入一个事件只会触及那个事件所指名的键。
+
+实测 145,564 个事件用时 6.1 秒，吞吐量保持平稳。完整论证和数字在[性能页](/docs/performance)。
+
+<Callout type="proved" title="这项优化从不被信任">
+索引的每一个单元格都是日志的纯函数 —— 与朴素求值器通过重读日志算出来的是同一个函数。
+那是对一条**真值主张**的优化，所以 `Machine(audit=True)` 会用**两种方式**回答每一次查询，
+一旦不一致就抛出异常。
+</Callout>

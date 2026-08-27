@@ -1,0 +1,189 @@
+---
+title: 快速上手
+description: 推导一个九行程序的正确性条件，推翻它，修好它，然后拿一段对话跑一遍。
+---
+
+# 快速上手
+
+<p className="lede">
+五分钟，四条命令，一个会说谎的程序。结束时你会看到检查器产生一段历史，推翻一条根本没有
+人写下来过的义务。
+</p>
+
+<Callout type="note" title="这些命令是针对仓库运行的">
+下面每一个路径都是 eleph 仓库里的文件，而 `examples/` 下的任何东西都不会被
+`pip install` 或 `uv add` 安装。请先克隆：
+
+```bash
+git clone https://github.com/dev-isaacmello/eleph && cd eleph
+uv venv && uv pip install -e ".[dev]"
+source .venv/bin/activate
+```
+
+如果你更愿意留在自己的项目里，本页的程序都是完整印出来的：把其中一个存成你自己的文件，
+去掉 `examples/` 前缀即可。见[安装](/docs/installation)。
+</Callout>
+
+## 1. 程序
+
+<Snippet file="examples/airline_buggy.eleph">
+```eleph
+program airline
+
+event make_reservation(passenger, flight)
+event cancel_reservation(passenger, flight)
+event board(passenger, flight)
+
+fact has_reservation(P, F) := make_reservation(P, F) since_not cancel_reservation(P, F)
+
+on question(Caller, has_reservation(P, F)):
+    if make_reservation(P, F):
+        answer Caller yes
+    else:
+        answer Caller no
+```
+</Snippet>
+
+这里没有断言，没有契约，没有测试。有的是一份关于什么事情可能发生的声明、一个
+`has_reservation` 含义的定义，以及一个回答问题的处理器。
+
+## 2. 问问这段文本要求了什么
+
+```bash
+eleph obligations examples/airline_buggy.eleph
+```
+
+```out
+examples/airline_buggy.eleph: condicoes que o proprio texto do programa exige
+
+  linha 17  question(Caller, has_reservation)
+    resposta yes e verdadeira
+      supondo   alguma vez make_reservation(P, F)
+      entao     (make_reservation(P, F) e desde entao nenhum cancel_reservation(P, F))
+
+  linha 19  question(Caller, has_reservation)
+    resposta no e verdadeira
+      supondo   nao alguma vez make_reservation(P, F)
+      entao     nao (make_reservation(P, F) e desde entao nenhum cancel_reservation(P, F))
+```
+
+把第一条读出声来：*在程序说「是」的那条路径上，是什么让「是」为真？* `supondo` 那一行
+是路径条件 —— 它为了走到这里而选择的分支。`entao` 那一行是说出 `yes` 所主张的内容。
+
+这两条都不是人写的。两条都是从程序里读出来的。
+
+## 3. 试着推翻它们
+
+```bash
+eleph check examples/airline_buggy.eleph
+```
+
+```out
+examples/airline_buggy.eleph  ->  programa airline
+3 eventos, 1 fato, 1 handler
+
+2 obrigacoes derivadas do texto do programa
+cada uma checada no seu limiar de completude (o maior: 3 eventos) -- exaustivo
+
+  X   question(Caller, has_reservation)  linha 17  -  resposta yes e verdadeira
+      neste caminho o programa afirma que vale (make_reservation(P, F) e desde
+      entao nenhum cancel_reservation(P, F))
+
+      historico que quebra a obrigacao:
+        1. make_reservation(P, F)
+        2. cancel_reservation(P, F)
+        3. disse-ask-sobre-has_reservation(Caller, P, F)   <- fala, registrada
+                                       porque o elefante nao esquece
+
+      o programa responde yes, a verdade do log e no
+
+  ok  question(Caller, has_reservation)  linha 19  -  resposta no e verdadeira
+
+REPROVADO  -  1 obrigacao nao cumprida
+```
+
+反例是一段历史，不是一个失败的断言：预订、取消、然后发问。程序回答 `yes`；日志说 `no`。
+
+注意第三个事件。那个问题本身也被记录了下来，因为程序自己说的话，和其他一切进的是同一份
+日志。
+
+## 4. 修复只差一个词
+
+<Snippet file="examples/airline.eleph" title="同一个程序，正确的写法">
+```eleph
+on question(Caller, has_reservation(P, F)):
+    if make_reservation(P, F) since_not cancel_reservation(P, F):
+        answer Caller yes
+    else:
+        answer Caller no
+```
+</Snippet>
+
+```out
+$ eleph check examples/airline.eleph
+
+  ok  question(Caller, has_reservation)  linha 16  -  resposta yes e verdadeira
+  ok  question(Caller, has_reservation)  linha 18  -  resposta no e verdadeira
+
+PROVADO  -  2 obrigacoes valem para TODO historico, de qualquer tamanho
+```
+
+<Callout type="proved">
+`PROVADO` 比「测试通过了」更强。每条义务都是在它自己的[完备性
+阈值](/docs/concepts/completeness)处被检查的，这使得「没有找到反例」等于「不存在反例」
+—— 对所有历史，不限长度。
+</Callout>
+
+## 5. 跑一段真正的对话
+
+一个更大的程序，带容量上限、座位和承诺：
+
+```bash
+eleph run examples/companhia.eleph examples/voo.session --log /tmp/voo.jsonl
+```
+
+```out
+  alice: request make_reservation(alice, ba117)
+      [log] make_reservation(alice, ba117)
+      programa: aceito
+      programa: prometo, e ja esta feito
+      programa: prometo -- a alice: (assign_seat(alice, ba117) e desde entao
+                nenhum cancel_reservation(alice, ba117)) (antes de board(alice, ba117))
+  carla: request make_reservation(carla, ba117)
+      programa: recuso
+  [log] board(bruno, ba117)   (historico pre-existente)
+      [livro] QUEBRADA -- a bruno: (assign_seat(bruno, ba117) e desde entao
+                nenhum cancel_reservation(bruno, ba117)) (antes de board(bruno, ba117))
+
+  livro de compromissos
+    CUMPRIDA  a alice: ...
+    QUEBRADA  a bruno: ...
+
+  log: 22 eventos (4 do mundo, 18 de fala)
+
+  1 promessa quebrada
+```
+
+carla 被拒绝，因为这趟航班只坐得下两个人。bruno 没有座位就登机了，于是他那条承诺的期限
+到了，账本如实记下。账本本身没有任何东西被存储：它是从事件重新算出来的。
+
+```bash
+eleph ledger examples/companhia.eleph /tmp/voo.jsonl
+```
+
+## 接下来去哪
+
+<Steps>
+<li>
+**[McCarthy 的 bug](/docs/the-mccarthy-bug)** —— `make_reservation` 和
+`has_reservation` 为什么是两个不同问题的完整故事。
+</li>
+<li>
+**[过去是唯一的状态](/docs/concepts/past-is-state)** —— 什么取代了变量，以及为什么这是
+要点而不是限制。
+</li>
+<li>
+**[Python API](/docs/python-api)** —— 把同一套规则放到现有系统底下，一个 `.eleph`
+处理器都不用写。
+</li>
+</Steps>

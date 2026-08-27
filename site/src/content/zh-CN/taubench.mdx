@@ -1,0 +1,112 @@
+---
+title: τ-bench 审计
+description: 把 τ-bench 自己策略里的两条规则写成 eleph 事实，在 200 条已发表轨迹上重放。两条都被发现有歧义。
+---
+
+# τ-bench 审计
+
+<p className="lede">
+<a href="https://arxiv.org/abs/2406.12045">τ-bench</a>（ICLR 2025）给一个航空公司客服
+智能体提供了一份成文的策略，其中两次声明<strong>「API 不会替智能体检查这些」</strong>，并
+通过对最终数据库做哈希来为每次运行打分。这条义务被写了出来，却既未被强制执行，也未被度量。
+</p>
+
+它的两条规则在这里被写成 `.eleph` 事实，并在已发表的 200 条 gpt-4o 航空轨迹上重放。
+
+## 数字
+
+```out
+$ python bench/taubench/check.py         # 确认规则
+  gasta na acao                 85 escritas sem confirmacao,  8 em execucoes pontuadas como sucesso
+  expira no turno               52 escritas sem confirmacao,  4 em execucoes pontuadas como sucesso
+
+$ python bench/taubench/cancel_check.py  # 取消资格规则
+  seguro E motivo coberto       38 cancelamentos proibidos, 26 deles no gabarito anotado
+  ter seguro basta              16 cancelamentos proibidos,  7 deles no gabarito anotado
+```
+
+每一行是对那条规则的一种*读法*，不是验证器的一个变体。这才是那个发现。
+
+## 从中得出了什么
+
+把规则形式化地写下来，做成了一件比数违规更有意思的事。**两条规则都被发现有歧义，而且是
+要紧的歧义。**
+
+### 「一个 yes」
+
+确认规则没有说清一个 `yes` 覆盖的是一次动作还是一批。两种读法**没有强弱之分**：25 次运行
+只有第一种会标记，4 次只有第二种会。没有一种更宽松的读法可以退守。这句话必须被裁定。
+
+| 读法 | 未确认的写入 | …其中在被判为成功的运行里 |
+|---|---|---|
+| 确认在动作上被消耗掉 | 85 | 8 |
+| 确认在本轮结束时失效 | 52 | 4 |
+
+### 「并且条件被满足」
+
+取消规则允许取消的条件是*「仅当购买了旅行保险**并且条件被满足**」* —— 而它从未说明是哪个
+条件。
+
+严格读下来，它禁止 38 次取消，**其中 26 次是被标注的标准答案自己执行的**。也就是说，这处
+欠规约触及的是**标准答案**，而不只是智能体。
+
+该 benchmark 后来的版本恰好重写了那句话。这次形式化在没有被指路的情况下正好落在了它上面。
+
+## 这不是在说什么
+
+<Callout type="note" title="τ-bench 没有错">
+它的奖励函数是有文档、有意为之的，而论文里明确写了 `r = 1`「可能是必要但不充分的条件」。
+这里的主张要窄得多：**一个智能体被要求遵守的承诺，并不被那个度量该智能体的东西所度量，而
+度量它只需要一行。**
+</Callout>
+
+## 这次审计的形态
+
+这是 **observer** 形态 —— 三种里最轻的一种。τ-bench 没有被改动分毫。轨迹是别人的，它们
+被当作事件重放，然后向那些事实询问什么曾经为真：
+
+<Snippet file="bench/taubench/cancel.eleph" title="一条来自已发表 benchmark 的规则，写成事实">
+```eleph
+fact tem_seguro(R: Reservation) := comprou_seguro(R) since_not cancelou(R)
+```
+</Snippet>
+
+那个期限的处理方式值得一提：τ-bench 的规则提到一个 24 小时窗口，而 eleph
+[没有挂钟时间](/docs/limits)。改由宿主系统把期限作为事件发出来，而事件溯源系统本来就是
+这么处理时间的。
+
+## 运行
+
+```bash
+python bench/taubench/check.py
+python bench/taubench/cancel_check.py
+```
+
+轨迹和航班表 —— 约 6 MB，MIT 许可，Sierra Research —— 是**在首次使用时下载、并且刻意不
+纳入版本库的**：指向源头比留一份可能过期的副本更诚实。没有网络时，测试会干净地跳过。
+
+## 每一个数字都由人手工核对过
+
+<Callout type="proved" title="这个项目唯一的一条规则">
+**不要发布一个你没有亲手核对过的数字。**
+
+上面每一个数值都经受过对个别案例的审计，而且**其中三个因此改变了**：
+
+* 第一次统计未确认写入时，把一批操作算在了一个 `yes` 名下；
+* 第二次把「先升舱再取消」判成了违规，而策略明确允许这样做；
+* 第三次用「发生过一次」去建模一个可变属性。
+
+每一次修正都让数字**更小**，让主张更强。
+</Callout>
+
+`tests/test_taubench.py` 把每一个数值钉死，所以任何让某个数字发生移动的验证器改动都会让
+测试套件失败。
+
+## 它自己的局限
+
+<Callout type="limit">
+这次审计用**正则表达式**读自然语言。同意是从一份宽松的词表里匹配的，所以计数会**低估而不是
+高估**。抽样的违规案例在数字被发布之前是人工读过的。
+</Callout>
+
+完整的审计、两处歧义，以及每个数字经受过什么，在 <Source file="bench/README.md" />。

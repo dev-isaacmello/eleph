@@ -1,0 +1,94 @@
+---
+title: 权限
+description: McCarthy 的第八种言语行为。不是回答是否为真，而是这一方是否有资格发问。
+---
+
+# 权限
+
+<p className="lede">
+一个如实地把任何客户的余额告诉任何发问者的客服智能体，一句谎都没说。这门语言里其他每一条
+义务它都能通过。它依然是一起事故。
+</p>
+
+## 第八种言语行为
+
+McCarthy 把权限列入了程序会执行的言语行为，而这恰恰是寻常的评审从不过问的一种。在 eleph
+里，一个处理器可以被它把守：
+
+```eleph
+on question(Quem, saldo(C)) permitted pode_perguntar(Quem, C):
+    answer Quem with saldo(C)
+```
+
+`permitted` 接收一条事实，所以权限是**日志**所支持的东西，不是某个配置文件所声称的东西：
+
+```eleph
+fact autorizado(Q: Party, U: User) := autenticou(Q, U) since_not deslogou(Q, U)
+```
+
+一个人对某个账户有权限，条件是他对那个账户认证过、并且此后没有登出。这是一条关于发生过
+什么的公式，和这里其他一切一样可检查。
+
+## 它进入路径条件
+
+关键的设计决定是：权限**不是**一项放在旁边单独运行的检查。它成为从那个处理器推导出的每一
+条义务的假设的一部分，所以回答是*在它之下*被证明的：
+
+```out
+  ok  question(Quem, active)  linha 55  -  a resposta responde a pergunta feita
+  ok  question(Quem, may_refund)  linha 58  -  a resposta responde a pergunta feita
+  ok  question(Quem, needs_escalation)  linha 61  -  a resposta responde a pergunta feita
+
+PROVADO  -  3 obrigacoes valem para TODO historico, de qualquer tamanho
+```
+
+一个只有对有权限的来电者才正确的处理器是可证的；同一个处理器去掉那道门，就不是同一个程序
+了。
+
+## 它失败时是闭合的
+
+在运行时，权限不成立的处理器会抛出 `NotPermitted`，而不是回答。这个不对称是刻意的：
+
+> 一个被扣下的回答是可以补救的。一个被泄露的回答不可以。
+
+```python
+from eleph import NotPermitted
+
+try:
+    g.assert_answer("saldo", value, "quem", "conta")
+except NotPermitted:
+    ...   # 上报、要求认证、拒绝 —— 除了回答，什么都行
+```
+
+## 没锁的门
+
+一个处理器有门、它旁边那个没有，就是锁好的前门旁边开着一扇窗。从 0.3.0 起，这在求解器
+运行之前就会被报告为结构性缺陷：
+
+```out
+  X   question(Quem, saldo)  linha 22
+      outro handler sobre este assunto exige permissao e este nao
+```
+
+这项检查是结构性的，因为它关乎程序的形状，而不是任何一段具体历史。见
+[义务](/docs/concepts/obligations)。
+
+## 为什么这不是一套角色系统
+
+<Callout type="limit">
+`permitted` 把一个处理器交由日志所支持的一条事实把守，这覆盖了*「这个来电者对这个账户
+认证过吗」*。这里没有**角色、层级或委派**。如果你的授权模型需要这些，请在外部建模，然后
+把结论作为事件发出来。
+</Callout>
+
+## 度量
+
+在 [LangChain 对照实验](/docs/integration/langchain)里，`conta de outra pessoa` 这个场景
+—— 一个对自己账户认证过的人去问一个陌生人的账户 —— 在没有守卫时**五次里失败五次**。智能体
+查了，也回报了，每一次都是。
+
+这不是一次疏忽。提示词里没有任何东西说不许这么做，客户的请求也完全清楚，回答是那个乐于
+助人的选择。一个不断言记录所不支持的任何东西、并且兑现它作出的每一条承诺的智能体，会这样
+干一整天。
+
+这就是 `permitted` 存在所要堵上的那道缝。

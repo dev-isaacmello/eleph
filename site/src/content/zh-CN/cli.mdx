@@ -1,0 +1,233 @@
+---
+title: 命令行
+description: 五个命令 —— obligations、check、run、talk、ledger —— 连同每一个选项和每一个退出码。
+---
+
+# 命令行
+
+<p className="lede">
+五个命令。其中两个读程序，两个运行它，还有一个读回它还欠着什么。
+</p>
+
+```out
+$ eleph --help
+usage: elephant [-h] {check,obligations,run,talk,ledger} ...
+
+positional arguments:
+  {check,obligations,run,talk,ledger}
+    check               verificar um programa
+    obligations         mostrar as condicoes derivadas, sem verificar
+    run                 executar um dialogo contra o programa
+    talk                conversar em linguagem natural
+    ledger              o que o programa ainda deve
+```
+
+每个命令都接受 `--no-color`，这正是你在 CI 和管道里想要的。
+
+<Callout type="note" title="本页的路径是仓库路径">
+`examples/` 不会被 `pip install` 或 `uv add` 安装，所以这里引用的运行结果都默认你克隆了
+仓库。另外，如果 `eleph` 在某个项目的 `.venv` 里而不在你的 PATH 上，请给所有命令加上
+`uv run` 前缀。见[安装](/docs/installation)。
+</Callout>
+
+## `eleph obligations`
+
+```bash
+eleph obligations <文件>
+```
+
+打印程序自己的文本所要求的正确性条件，不去尝试消解它们。这个动作的意义只有一个：
+**这些都不是人写的。**
+
+```out
+$ eleph obligations examples/airline_buggy.eleph
+
+examples/airline_buggy.eleph: condicoes que o proprio texto do programa exige
+
+  linha 17  question(Caller, has_reservation)
+    resposta yes e verdadeira
+      supondo   alguma vez make_reservation(P, F)
+      entao     (make_reservation(P, F) e desde entao nenhum cancel_reservation(P, F))
+
+  linha 19  question(Caller, has_reservation)
+    resposta no e verdadeira
+      supondo   nao alguma vez make_reservation(P, F)
+      entao     nao (make_reservation(P, F) e desde entao nenhum cancel_reservation(P, F))
+```
+
+结构性缺陷列在义务之后，前面带上行号。
+
+## `eleph check`
+
+```bash
+eleph check <文件> [--bound N] [--objects N]
+```
+
+推导出义务，并在各自的[完备性阈值](/docs/concepts/completeness)处尝试推翻每一条。
+
+```out
+$ eleph check examples/companhia.eleph
+
+examples/companhia.eleph  ->  programa companhia
+5 eventos, 4 fatos, 6 handlers
+
+6 obrigacoes derivadas do texto do programa
+cada uma checada no seu limiar de completude (o maior: 10 eventos) -- exaustivo
+
+  ok  question(C, has_reservation)  linha 30  -  a resposta responde a pergunta feita
+  ok  question(C, has_seat)  linha 33  -  a resposta responde a pergunta feita
+  ok  question(C, seats_left)  linha 36  -  a resposta responde a pergunta feita
+  ok  request(C, make_reservation)  linha 45  -  a promessa esta cumprida ao ser feita
+  ok  request(C, make_reservation)  linha 46  -  a promessa pode vir a ser cumprida (antes de board(P, F))
+      cumprivel por: request assign_seat > entao l51
+  ok  request(C, cancel_reservation)  linha 61  -  a promessa esta cumprida ao ser feita
+
+PROVADO  -  6 obrigacoes valem para TODO historico, de qualquer tamanho
+```
+
+### 选项
+
+| 选项 | 默认 | 作用 |
+|---|---|---|
+| `--bound N` | 完备性阈值 | 强制历史长度。低于阈值时结果就不再是证明，工具会如实说明 |
+| `--objects N` | 计算出的论域 | 强制每个 sort 的对象数量 |
+| `--no-color` | 关 | 纯文本输出 |
+
+<Callout type="danger" title="低于阈值的上界不是证明">
+```out
+$ eleph check examples/fundo.eleph --bound 6
+
+  linha 11: limite pedido abaixo do limiar
+
+  ok? question(C, elite)  linha 11  -  resposta yes e verdadeira
+
+SEM CONTRAEXEMPLO  -  dentro dos limites checados, que nao sao exaustivos aqui
+```
+`ok?` 和 `SEM CONTRAEXEMPLO` 都表示这次运行不是穷尽的。这个例子要到第七个事件之后才
+说谎。
+</Callout>
+
+### 退出码
+
+| 码 | 含义 |
+|---|---|
+| `0` | 没有失败 —— 要么是 `PROVADO`，要么是 `SEM CONTRAEXEMPLO` |
+| `1` | `REPROVADO`：至少有一条义务存在反例或结构性缺陷 |
+| `2` | 文件没有通过词法、语法或名字解析 |
+
+注意 `0` 同时覆盖了「已证明」和「非穷尽」。如果你的 CI 需要的是证明、而不只是没有反例，
+请 grep `PROVADO`。
+
+## `eleph run`
+
+```bash
+eleph run <文件> <脚本> [--log 路径]
+```
+
+拿一段脚本化的会话跑这个程序。脚本行是：
+
+<Snippet file="examples/voo.session">
+```text
+# Capacidade 2. Tres passageiros querem entrar.
+request alice make_reservation(alice, ba117)
+request bruno make_reservation(bruno, ba117)
+request carla make_reservation(carla, ba117)
+
+# Alice recebe assento; a promessa dela e paga.
+request alice assign_seat(alice, ba117)
+
+# Bruno embarca sem assento. O prazo vence.
+given board(bruno, ba117)
+
+question alice has_seat(alice, ba117)
+question carla has_reservation(carla, ba117)
+```
+</Snippet>
+
+| 指令 | 含义 |
+|---|---|
+| `request <方> <事件>(...)` | 有人请求程序做某件事 |
+| `question <方> <事实>(...)` | 有人问程序某件事是否成立 |
+| `given <事件>(...)` | 外部世界做了某件事，不在这段对话里 |
+
+`--log 路径` 让历史持久化。重新打开同一个路径会重放它，于是这次运行会从上次停下的地方
+继续。
+
+如果有任何承诺最终被违背，退出码为 `1`；一次拒绝会打印 `RECUSA`，同样以 `1` 退出。
+
+## `eleph talk`
+
+```bash
+eleph talk <文件> <对话> [--roster a,b,c] [--claude] [--log 路径]
+```
+
+进去的是日常语言，出来的是言语行为，底下是同样的保证。
+
+```out
+$ eleph talk examples/companhia.eleph examples/conversa.txt --roster alice,bruno,ba117
+
+  extrator: PatternExtractor (proposicoes, nao decisoes)
+
+  alice: "quero make_reservation para alice no ba117"
+      -> lido como: request make_reservation(alice, ba117)
+  alice: request make_reservation(alice, ba117)
+      [log] make_reservation(alice, ba117)
+      programa: aceito
+      programa: prometo, e ja esta feito
+  alice: "a alice tem has_reservation no ba117?"
+      -> lido como: question has_reservation(alice, ba117)
+      programa: yes
+  alice: e a cotacao do dolar hoje?
+      (nada que este programa saiba tratar)
+```
+
+| 选项 | 作用 |
+|---|---|
+| `--roster a,b,c` | 已知的名字，好让抽取器能解析它们 |
+| `--claude` | 用 Claude 作为抽取器，而不是模式匹配器。需要 `pip install "eleph[claude]"` 和一份凭证 |
+| `--log 路径` | 持久化历史，与 `run` 相同 |
+
+<Callout type="note" title="抽取器只负责提议；决定权在语言">
+前端把文本变成候选的言语行为，仅此而已。模型填写的那份 JSON schema 是从程序自己的处理器
+生成的，所以它无法提议一个程序里没有的行为。如果某个提议会推翻一条义务，运行时会拒绝它，
+并打印 `o extrator propos; a linguagem recusou.`
+</Callout>
+
+## `eleph ledger`
+
+```bash
+eleph ledger <文件> <日志>
+```
+
+这个程序还欠着什么，从它自己的历史里读回来。
+
+```out
+$ eleph ledger examples/companhia.eleph /tmp/voo.jsonl
+
+/tmp/voo.jsonl
+  22 eventos (4 do mundo, 18 de fala)
+
+  CUMPRIDA  a alice: (assign_seat(alice, ba117) e desde entao nenhum
+            cancel_reservation(alice, ba117)) (antes de board(alice, ba117))
+  QUEBRADA  a bruno: (assign_seat(bruno, ba117) e desde entao nenhum
+            cancel_reservation(bruno, ba117)) (antes de board(bruno, ba117))
+
+  1 promessa quebrada
+```
+
+如果有任何东西被违背，退出码为 `1`。那份账本没有任何东西被存储：它是从事件重新算出来的。
+
+## 读懂输出
+
+| 标记 | 颜色 | 含义 |
+|---|---|---|
+| `ok` | 绿 | 在完备性阈值处被消解 |
+| `ok?` | 黄 | 挺过了所给的上界，而那个上界低于阈值 |
+| `X` | 红 | 反例，以历史的形式打印 |
+| `CUMPRIDA` | 绿 | 承诺已兑现 |
+| `ABERTA` | 黄 | 承诺未清偿 |
+| `QUEBRADA` | 红 | 承诺已违背 |
+| `LIBERADA` | 暗 | 承诺已解除 |
+| `RECUSA` | 红 | 运行时拒绝了一个言语行为 |
+
+`--help` 里显示的命令名是 `elephant`，那是解析器的 `prog`；安装出来的入口点是 `eleph`。

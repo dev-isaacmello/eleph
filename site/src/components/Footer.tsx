@@ -21,6 +21,13 @@ const CITE = {
       obrigações de compromisso, o runtime incremental e a API embutível são deste projeto.
     </>
   ),
+  'zh-CN': (
+    <>
+      {/* No line break may fall between two Han characters: JSX turns it into a
+          space, and Chinese does not separate words with one. */}
+      本项目实现并扩展了 <strong>Elephant 2000</strong>，这是一门基于言语行为的编程语言，由 John McCarthy 规范设计（斯坦福，1998 年 11 月 6 日），他本人从未将其实现。设计出自他之手；完备性阈值、承诺义务、增量运行时以及可嵌入的 API 则属于本项目。
+    </>
+  ),
 }
 
 export function Footer() {

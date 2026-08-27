@@ -1,0 +1,153 @@
+---
+title: 承诺
+description: 四种强度的承诺、一次静态的可兑现性检查，以及一份从日志推导而来、而非被存储的账本。
+---
+
+# 承诺
+
+<p className="lede">
+这里的承诺不是文本。它是这门语言的一个构造，携带一条编译器会检查的义务，而且还欠着什么
+是从日志推导出来的，不是存在旁边某张表里。
+</p>
+
+## 四种强度
+
+| 形式 | 它主张什么 | 怎么检查 |
+|---|---|---|
+| `offer C that φ` | 有意愿，尚未负债 —— 没有人接受它 | 存在某条路径可能兑现 φ |
+| `promise C that φ` | φ **现在为真** | Z3，基于日志加上该处理器刚刚记录的内容 |
+| `promise C eventually φ` | φ 将在某个时刻成立 | 存在某条路径把 φ 由假变真 |
+| `promise C that φ before e(...)` | φ 将在 `e` 发生之前成立 | 同上，外加运行时盯着 `e` |
+
+要约是这门语言能说出的最弱的东西，而且它与承诺是刻意分开的：它所欠的只是「它不是空的」。
+0.3.0 加入。
+
+## 即时承诺
+
+```eleph
+on request(Caller, make_reservation(P, F)):
+    if has_reservation(P, F):
+        decline Caller
+    else:
+        record make_reservation(P, F)
+        accept Caller
+        promise Caller that has_reservation(P, F)
+```
+
+`promise C that φ` 主张 φ 在它被说出的那一刻成立，所以这条义务是基于日志**加上该处理器
+一路走到这里所记录的内容**来消解的。上面这条承诺之所以可证，只是因为 `record` 先执行了。
+把这两行互换，检查就不通过了。
+
+```out
+  ok  request(C, make_reservation)  linha 45  -  a promessa esta cumprida ao ser feita
+```
+
+## 未来承诺
+
+```eleph
+promise C that has_seat(P, F) before board(P, F)
+```
+
+这在说出时不可能为真 —— 这正是它之所以是未来承诺的原因。编译器改为证明**程序中存在某条
+路径能够确立它**，并要求那条路径把它由假变真：
+
+```out
+  ok  request(C, make_reservation)  linha 46  -  a promessa pode vir a ser cumprida (antes de board(P, F))
+      cumprivel por: request assign_seat > entao l51
+```
+
+那段追踪点出了具体是哪条路径 —— 这里是 `assign_seat` 那个请求处理器。
+
+<Callout type="limit" title="可兑现，不是活性">
+编译器证明的是存在一条路径。它无法证明来电者会走上那条路径，因为没有任何程序做得到。他们
+不走的时候会怎样，正是账本存在的意义。
+</Callout>
+
+## 账本
+
+一条承诺有四种状态：
+
+| 状态 | 含义 |
+|---|---|
+| `ABERTA` | 未清偿 —— 已作出但尚未了结 |
+| `CUMPRIDA` | 已兑现 |
+| `QUEBRADA` | 已违背 —— 期限事件发生时承诺仍为假 |
+| `LIBERADA` | 已解除 —— 程序被 `release C from φ` 免除了这笔债务 |
+
+拿这家航空公司跑一段一位乘客拿到座位、另一位没座位就登机的会话：
+
+```out
+$ eleph run examples/companhia.eleph examples/voo.session --log /tmp/voo.jsonl
+
+  alice: request assign_seat(alice, ba117)
+      [log] assign_seat(alice, ba117)
+      [livro] cumprida -- a alice: (assign_seat(alice, ba117) e desde entao
+              nenhum cancel_reservation(alice, ba117)) (antes de board(alice, ba117))
+      programa: aceito
+  [log] board(bruno, ba117)   (historico pre-existente)
+      [livro] QUEBRADA -- a bruno: (assign_seat(bruno, ba117) e desde entao
+              nenhum cancel_reservation(bruno, ba117)) (antes de board(bruno, ba117))
+
+  livro de compromissos
+    CUMPRIDA  a alice: ...
+    QUEBRADA  a bruno: ...
+
+  1 promessa quebrada
+```
+
+bruno 那条承诺是被一个事件违背的，不是被一个定时器。`since_not` 知道顺序，不知道时间 ——
+见[局限](/docs/limits)。
+
+## 账本是推导来的，不是存储的
+
+承诺被记录为事件。账本是通过重放它们重新算出来的，这也是为什么重新打开一份日志会拿回同样
+的那些债务：
+
+```bash
+eleph ledger examples/companhia.eleph /tmp/voo.jsonl
+```
+
+```out
+/tmp/voo.jsonl
+  22 eventos (4 do mundo, 18 de fala)
+
+  CUMPRIDA  a alice: ...
+  QUEBRADA  a bruno: ...
+
+  1 promessa quebrada
+```
+
+一笔债务是被兑现、被违背还是被解除，**取决于它之后发生的那些事件**，所以是重新算出来的，
+而不是被快照下来的。不存在任何可能与历史相矛盾的状态。
+
+## 解除一笔债务
+
+```eleph
+on request(C, cancel_reservation(P, F)):
+    if has_reservation(P, F):
+        record cancel_reservation(P, F)
+        accept C
+        promise C that not has_reservation(P, F)
+        release C from has_seat(P, F)
+    else:
+        decline C
+```
+
+取消让那条座位承诺变得无法兑现，所以程序显式地免除了自己。`release` 和其他言语行为一样，
+也进日志；一笔被悄悄放下的债务，和一笔被正式解除的债务，是两段不同的历史。
+
+## 从 Python 使用
+
+同样这四种强度，不写处理器也能用：
+
+```python
+g.promise("alice", "has_seat", "alice", "ba117",
+          before=("board", ("alice", "ba117")))
+
+g.outstanding()   # [Commitment(...)]  还欠着的
+g.breached()      # [Commitment(...)]  没有兑现的
+g.release("alice", "has_seat", "alice", "ba117")
+g.ledger          # 每一条承诺，带状态
+```
+
+见 [Python API](/docs/python-api)。

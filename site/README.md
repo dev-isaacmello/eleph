@@ -23,16 +23,17 @@ npm run preview
 | Sitemap, robots | same script | generated from the same walk, so they cannot drift from the content |
 | Origin | `scripts/origin.mjs` | no domain is written down anywhere; the build reads Vercel's |
 | Highlighting | `src/lib/eleph-grammar.ts` | TextMate grammars for `.eleph` and for what the CLI prints |
+| CJK line breaks | `scripts/remark-cjk-linebreaks.mjs` | drops the space a wrapped source line would otherwise insert mid-word in Chinese |
 | Design tokens | `src/styles/tokens.css` | the only place a colour is written; both themes |
 
 Adding a page is three steps: write `src/content/en/<path>.mdx`, add the route
-and its title per language to `src/lib/nav.ts`, then write the translation at
-`src/content/pt-BR/<path>.mdx`.
+and its title per language to `src/lib/nav.ts`, then write the translation in
+each `src/content/<locale>/<path>.mdx`.
 
 ## Languages
 
 English is the default and lives at the root. Every other locale carries a path
-prefix: `/pt-BR/docs/...`.
+prefix: `/pt-BR/docs/...`, `/zh-CN/docs/...`.
 
 Routes are stored canonically (`/docs/...`) everywhere — in `nav.ts`, in the
 search index, and in links written inside MDX. The prefix is applied at render.
@@ -51,6 +52,19 @@ search, the sitemap and `hreflang` follow from the content directory.
 
 `README_TRANSLATIONS` holds languages the project has as translated READMEs but
 not as pages here. They belong in the footer, never in the language menu.
+
+### Writing Chinese
+
+A soft line break inside a paragraph is a space, which is right for Latin
+script and wrong for Han: it opens a gap in the middle of a word purely because
+the source was wrapped. `scripts/remark-cjk-linebreaks.mjs` drops the break
+when the characters on both sides of it are CJK, so `.mdx` files can be wrapped
+normally.
+
+**It does not reach JSX.** A Chinese string in a `.tsx` file (the landing copy,
+the footer citation) must not be wrapped between two CJK characters, including
+across `，` and `。`, because JSX collapses that break into a space and no
+plugin runs on it. Keep those on one long line.
 
 ## Fence languages
 

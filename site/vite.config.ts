@@ -11,6 +11,7 @@ import { fileURLToPath } from 'node:url'
 
 import { elephGrammar, elephOutputGrammar } from './src/lib/eleph-grammar'
 import { resolveOrigin } from './scripts/origin.mjs'
+import remarkCjkLineBreaks from './scripts/remark-cjk-linebreaks.mjs'
 
 const here = path.dirname(fileURLToPath(import.meta.url))
 const origin = resolveOrigin()
@@ -42,6 +43,7 @@ export default defineConfig({
           remarkGfm,
           remarkFrontmatter,
           [remarkMdxFrontmatter, { name: 'meta' }],
+          remarkCjkLineBreaks,
         ],
         rehypePlugins: [
           rehypeSlug,

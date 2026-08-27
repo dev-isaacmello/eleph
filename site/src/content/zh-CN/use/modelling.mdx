@@ -1,0 +1,189 @@
+---
+title: 为你的领域建模
+description: 把你已有的表变成事件和事实，以及先给哪个工具加守卫。
+---
+
+# 为你的领域建模
+
+<p className="lede">
+这是采用 eleph 唯一真正需要新思考的部分。其余的都是四个方法调用。在这里，你拿起已有的
+那些表，换一个问题去问它们：不是<em>状态是什么</em>，而是<em>发生了什么</em>。
+</p>
+
+## 翻译
+
+你的数据库里每个客户一行，行上挂着若干列。eleph 没有列。事实是每一次都要向历史发问的
+一个问题。
+
+| 你有的 | 你记录的 | 你发问的 |
+|---|---|---|
+| `users.active`（布尔） | `subscribed(u)`、`cancelled(u)` | `active(U) := subscribed(U) since_not cancelled(U)` |
+| `charges.refunded_at`（可空） | `refunded(u, c)` | `refunded(U, C) since_not charged(U, C)` |
+| `sessions.user_id` | `authenticated(who, u)`、`logged_out(who, u)` | `authorised(Q, U) := authenticated(Q, U) since_not logged_out(Q, U)` |
+| `reservations`（一张表） | `make_reservation(p, f)`、`cancel_reservation(p, f)` | `count P: Passenger where has_reservation(P, F) < 2` |
+| 状态旁边的 `audit_log` | 不需要额外记录 | 只有日志；状态是推导出来的 |
+
+最后一行改变了人们如何论证一个系统。在寻常的设计里，审计日志是第二份产物，理应与第一份
+一致。这里没有第一份。
+
+## 关于事件的唯一一条规则
+
+<Callout type="proved" title="事件是发生过的事情，而且永远不会「未发生」">
+永远不要记录*状态*。记录*转移*。`set_active(u, false)` 是绕了几步的一列；`cancelled(u)`
+才是事件。
+
+如果你发现自己想把同一个事件记录两次来表示「仍然成立」，那你建模的是状态。退回一步，
+找出真正发生变化的那件事。
+</Callout>
+
+## 把该事件所决定的东西放进事件本身
+
+这是那个让示例付出两次运行代价的陷阱，也值得占据整整一页。
+
+退款规则的第一版写的是*「可退款 = 一笔未结的费用，并且客户不处于活跃状态」*：
+
+```eleph
+fact refundable(U, C) := charged(U, C) and not active(U)
+```
+
+对活跃客户来说取消是被允许的。于是：
+
+```python
+guard.require("refundable", "ana", "c1")   # Ungrounded，正确
+
+guard.require("active", "ana")             # 被允许
+guard.record("cancelled", "ana")
+
+guard.require("refundable", "ana", "c1")   # 现在通过了
+```
+
+**两个各自被允许的动作，组合出一个被禁止的结果。** 今天取消一下，三个月前的一笔费用
+就变成可退款的了。模型偶尔会自己走到这一步 —— 它把「我上个月取消了」读成了一个取消
+请求。
+
+两个版本在修改前后都对所有历史被证明过。
+
+<Callout type="danger" title="证明说的是每条义务都成立。它没说这份策略就是你想要的那一份。">
+把规则写下来并不会交给你正确的规则。它交给你的是一条你可以去审问的规则，而正是这种审问
+把这件事翻了出来。没有可审问的东西，这个洞就会带着 `PROVADO` 这个词一起上线，那是可能
+出现的最糟组合。
+</Callout>
+
+修复方式，也是这门语言自己算不出来的任何情况下的通用做法：**决定一笔费用是否可退款的，
+是它落账的时刻**，而不是某人发问那一刻账户的状态。所以让费用把这一点带在自己的身份里：
+
+```eleph
+event charged_while_active(u: User, c: Charge, amount: Number)
+event charged_after_cancelling(u: User, c: Charge, amount: Number)
+
+fact refundable(U: User, C: Charge) :=
+    charged_after_cancelling(U, C, amount > 0) since_not refunded(U, C)
+```
+
+两个事件代替一个，组合问题就消失了。
+
+## 时间
+
+<Callout type="limit" title="没有挂钟时间">
+`since_not` 知道的是**顺序**，不是时间。*「在收费后 24 小时内退款」*无法直接表达。
+
+可行的做法，也是 τ-bench 审计所采用的，是让你的系统把期限本身作为一个事件发出来：
+
+```python
+guard.record("charged_after_cancelling", user, charge, amount)
+guard.promise(user, "refunded", user, charge,
+              before=("refund_window_closed", (user, charge)))
+
+# ... 24 小时后，你的调度器
+guard.record("refund_window_closed", user, charge)
+```
+
+时钟活在逻辑之外，而事件溯源系统本来就是这么处理时间的。
+</Callout>
+
+## 金额与数量
+
+参数位置上的比较会约束一个数值字段，**在该事件发生的那一刻**：
+
+```eleph
+fact within_limit(U: User, C: Charge) :=
+    charged_after_cancelling(U, C, amount <= 200) since_not refunded(U, C)
+```
+
+这正是[完备性论证](/docs/concepts/completeness)得以成立的原因，同时也是它的局限：你可以
+问*这一笔费用*是否超过 200，但不能问最近三笔之和是否超过。**历史上的聚合运算无法表达。**
+如果你需要一个累计值，请在你自己的系统里算好，然后把结论作为事件发出来。
+
+## 谁有资格发问
+
+对照实验里那个 0/5 的失败并不是撒谎。智能体如实地报告了一个陌生人的账户。那一次运行里
+所有其他义务都通过了。
+
+```eleph
+fact authorised(Q: Party, U: User) := authenticated(Q, U) since_not logged_out(Q, U)
+
+on question(Who, active(U)) permitted authorised(Who, U):
+    answer Who with active(U)
+```
+
+像对待其他一切那样，把权限建模成一条关于日志的事实。见[权限](/docs/concepts/permission)，
+包括它有意不去做的部分：没有角色，没有层级，也没有委派。
+
+## 具体从哪里开始
+
+<Steps>
+<li>
+**挑那个出错代价最大的工具。** 钱流出去、数据被披露、某件不可逆的事。不是调用最频繁的
+那个。
+</li>
+<li>
+**写下你的团队本来就在说的那句话。** *「我们只退那种在取消之后落账、尚未退过、并且低于
+200 雷亚尔的费用。」* 如果没有人能说出这句话，那就是你的发现，而且它比这次集成更有价值。
+</li>
+<li>
+**把每一个子句变成一个事件或一条事实。** 三个子句，三条事实。本页顶部那张表就是全部的
+翻译工作。
+</li>
+<li>
+**运行 `eleph check`。** 如果它证明不了，说明规则自相矛盾，而你在写任何 Python 之前就
+学到了这件事。
+</li>
+<li>
+**以 observer 的形态在昨天的流量上跑一遍。** 记录发生了什么，向事实询问什么为真，看它
+会不会与你的智能体的所作所为产生分歧。它什么都不强制执行，所以弄不坏任何东西。
+</li>
+<li>
+**然后为那一个工具打开 `require`。** 等第一个变得无聊了，再加下一个。
+</li>
+</Steps>
+
+## 读懂那份证明
+
+```out
+$ eleph check support.eleph
+
+8 eventos, 5 fatos, 2 handlers
+
+2 obrigacoes derivadas do texto do programa
+cada uma checada no seu limiar de completude (o maior: 6 eventos) -- exaustivo
+
+PROVADO  -  2 obrigacoes valem para TODO historico, de qualquer tamanho
+```
+
+`PROVADO` 意味着每条义务对**所有**历史成立，不限长度，而不只是你想到要测的那些。如果
+你看到的是 `SEM CONTRAEXEMPLO`，说明这次运行不是穷尽的，工具正在如实告诉你。差别在
+[证明，而非抽查](/docs/concepts/completeness)。
+
+## 接下来
+
+<Steps>
+<li>
+[**Python API**](/docs/python-api) —— 每一个方法和异常。
+</li>
+<li>
+[**时态表达式**](/docs/reference/expressions) —— 当 `since_not` 和 `count` 不够用时。
+</li>
+<li>
+[**诚实的局限**](/docs/limits) —— 经过验证，值得在你决定投入之前读一遍。
+</li>
+</Steps>

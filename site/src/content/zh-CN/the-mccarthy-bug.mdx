@@ -1,0 +1,146 @@
+---
+title: McCarthy 的 bug
+description: 「他们订过座位吗」和「他们现在持有座位吗」之间只差一个词，而整门语言存在的意义就是暴露它。
+---
+
+# McCarthy 的 bug
+
+<p className="lede">
+这个例子是 McCarthy 自己的，只有九行。一个客服程序被问到某位乘客是否持有订座。它的回答
+方式是去查这位乘客是否订过。这是两个不同的问题，差别就在取消上。
+</p>
+
+## 陷阱在文法里，而且是有意的
+
+在 eleph 里，一个裸的事件原子表示*这件事在过去至少发生过一次*：
+
+```eleph
+make_reservation(P, F)      # 曾经发生过
+```
+
+它读起来像「持有订座」，含义却是「订过座」。两者一直吻合，直到有人取消，之后就再也不
+吻合了。
+
+这不是一个换个更好的关键字就能修掉的语法意外。这正是真实系统会犯的错误的形状：一个叫
+`has_reservation` 的布尔列，有人忘了清；一个缓存；一份已经过期的汇总。这门语言有意让
+陷阱敞着，并在旁边放上一个验证器。
+
+## 验证器拿它做什么
+
+给定那个有 bug 的处理器，`eleph check` 报告：
+
+```out
+  X   question(Caller, has_reservation)  linha 17  -  resposta yes e verdadeira
+
+      historico que quebra a obrigacao:
+        1. make_reservation(P, F)
+        2. cancel_reservation(P, F)
+        3. disse-ask-sobre-has_reservation(Caller, P, F)
+
+      o programa responde yes, a verdade do log e no
+```
+
+这段输出里有三件事值得分开说。
+
+**这是一段历史，不是一份调用栈。** 反例是一串任何一次部署都可能产生的事件。你可以把它
+念给同事听。
+
+**第三个事件就是那个问题本身。** 程序自己的言语行为和外部世界的事件进的是同一份日志。
+正是这一点让 `spoke` 之后可以被查询，也正是因此大象从不遗忘。
+
+**最后一行同时点出了两边。** `o programa responde yes, a verdade do log e no` —— 程序
+说了什么，以及历史蕴含的是什么。义务就是两者之间的那道缝。
+
+## 为什么测试找不到它
+
+要为这个 bug 写测试，得先有人想到取消这件事。而全部的难处正在于此：这个 bug 恰恰对写下
+它的那个人不可见，因为那个人读到 `make_reservation(P, F)`，听到的是「持有订座」。
+
+那条义务也不是谁想出来的。它是被推导出来的：
+
+```out
+  linha 17  question(Caller, has_reservation)
+    resposta yes e verdadeira
+      supondo   alguma vez make_reservation(P, F)
+      entao     (make_reservation(P, F) e desde entao nenhum cancel_reservation(P, F))
+```
+
+`supondo` 是路径条件 —— 程序所走的分支。`entao` 是对*那个问题*回答 `yes` 所主张的内容。
+义务就是前者蕴含后者，而 Z3 被问的是：有没有哪段历史让前者为真、后者为假。
+
+## 修复，以及它的代价
+
+```eleph
+on question(Caller, has_reservation(P, F)):
+    if make_reservation(P, F) since_not cancel_reservation(P, F):
+        answer Caller yes
+    else:
+        answer Caller no
+```
+
+现在守卫条件就是事实自己的定义，于是不再有什么东西可以互相矛盾。更好的写法是只说一次：
+
+```eleph
+on question(Caller, has_reservation(P, F)):
+    answer Caller with has_reservation(P, F)
+```
+
+`answer C with φ` 按日志说的那样回答，这是不可能写错的形式。验证器两种都接受。
+
+<Callout type="proved">
+```out
+$ eleph check examples/airline.eleph
+
+  ok  question(Caller, has_reservation)  linha 16  -  resposta yes e verdadeira
+  ok  question(Caller, has_reservation)  linha 18  -  resposta no e verdadeira
+
+PROVADO  -  2 obrigacoes valem para TODO historico, de qualquer tamanho
+```
+</Callout>
+
+## 一个藏得更深的 bug
+
+隔一个事件是容易的。`examples/fundo.eleph` 是同样形状的错误，隔了七个：
+
+<Snippet file="examples/fundo.eleph">
+```eleph
+program milhagem
+sort Passenger
+sort Flight
+event make_reservation(p: Passenger, f: Flight)
+fact elite(P: Passenger, F: Flight) := count make_reservation(P, F) >= 8
+
+on question(C, elite(P, F)):
+    if count make_reservation(P, F) >= 7:
+        answer C yes
+    else:
+        answer C no
+```
+</Snippet>
+
+七不是八。一次停在六的有界搜索会**通过它**：
+
+```out
+$ eleph check examples/fundo.eleph --bound 6
+
+  ok? question(C, elite)  linha 11  -  resposta yes e verdadeira
+  ok? question(C, elite)  linha 13  -  resposta no e verdadeira
+
+SEM CONTRAEXEMPLO  -  dentro dos limites checados, que nao sao exaustivos aqui
+```
+
+`ok?` 和那个结论都在说：这次运行不是穷尽的。让它自己去算阈值，验证器就找到了：
+
+```out
+$ eleph check examples/fundo.eleph
+
+  X   question(C, elite)  linha 11  -  resposta yes e verdadeira
+      historico que quebra a obrigacao:
+        1..7. make_reservation(P, F)
+        8. disse-ask-sobre-elite(C, P, F)
+
+REPROVADO  -  1 obrigacao nao cumprida
+```
+
+这就是为什么验证器为每条义务计算一个[完备性阈值](/docs/concepts/completeness)，而不是
+接受一个固定上界。固定上界六是 0.1.0 的行为，而它是不可靠的。

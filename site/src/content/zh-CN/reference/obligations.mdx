@@ -1,0 +1,94 @@
+---
+title: 推导出的义务
+description: 十条正确性条件、各自要求什么，以及哪些由 Z3 消解、哪些是结构性的。
+---
+
+# 推导出的义务
+
+<p className="lede">
+编译器从程序里读出什么的一份参考表。背后的推理见<a href="/docs/concepts/obligations">概念
+页</a>。
+</p>
+
+## 那十条
+
+| 义务 | 要求 | 由谁检查 |
+|---|---|---|
+| 回答为真 | 在这条路径上，所给的回答由日志所蕴含 | Z3，在完备性阈值处 |
+| 回答确实回应了所问的问题 | 回答是关于问题主题的 | Z3 |
+| 即时承诺在说出时即成立 | φ 在日志加上该处理器所记录的内容上为真 | Z3 |
+| 未来承诺是可兑现的 | 存在某条路径把 φ 由假变真 | Z3 |
+| 要约是可兑现的 | 存在某条路径可能促成 φ | Z3 |
+| 类型与声明一致 | 每个参数都位于自身 sort 的位置上 | 编译器，对每一条事实，无论是否被用到 |
+| 没有没锁的门 | 受保护主题上没有哪个处理器缺少它邻居所具备的那道门 | 结构性 |
+| 每条路径恰好一个回答 | `question` 的每条路径恰好回答一次 | 结构性 |
+| 每条路径恰好一个回应 | `request` 的每条路径恰好接受或拒绝一次 | 结构性 |
+| 承诺已了结 | 没有未清偿的东西被悄悄遗忘 | 运行时账本 |
+
+## 每一条是怎么打印的
+
+运行 `eleph obligations` 只看这些条件而不去消解：
+
+```out
+$ eleph obligations examples/booking.eleph
+
+  linha 23  request(Caller, make_reservation)
+    a promessa esta cumprida ao ser feita
+      supondo   nao (make_reservation(P, F) e desde entao nenhum cancel_reservation(P, F))
+      entao     (make_reservation(P, F) e desde entao nenhum cancel_reservation(P, F))
+
+  linha 29  request(Caller, cancel_reservation)
+    a promessa esta cumprida ao ser feita
+      supondo   (make_reservation(P, F) e desde entao nenhum cancel_reservation(P, F))
+      entao     nao (make_reservation(P, F) e desde entao nenhum cancel_reservation(P, F))
+```
+
+| 行 | 是什么 |
+|---|---|
+| `linha N  handler` | 这条义务源自源码的哪里 |
+| 标题 | 这是十条中的哪一条 |
+| `supondo` | 路径条件：走到那条语句所选择的分支 |
+| `entao` | 目标：执行那个行为所主张的内容 |
+
+## 极性
+
+大多数义务是**全称的**：没有任何历史可以让假设为真而目标为假。有两条是**存在性的** ——
+未来承诺的可兑现性，以及要约的可兑现性 —— 在那里必须存在的是一条路径：
+
+```out
+  ok  request(C, make_reservation)  linha 46  -  a promessa pode vir a ser cumprida (antes de board(P, F))
+      cumprivel por: request assign_seat > entao l51
+```
+
+当一条存在性义务不成立时，验证器会照这个说法讲出来，而不是打印一段历史：
+
+```out
+      nenhum caminho do programa chega a cumprir isso
+```
+
+## 结论
+
+| 标记 | 含义 |
+|---|---|
+| `ok` | 在这条义务的完备性阈值处被消解 |
+| `ok?` | 挺过了所给的上界，而那个上界低于阈值 |
+| `X` | 存在反例，并被打印出来 |
+| `PROVADO` | 每条义务对所有历史成立，不限长度 |
+| `SEM CONTRAEXEMPLO` | 在并非穷尽的范围内没有东西被推翻 |
+| `REPROVADO` | 至少有一条义务未被满足 |
+
+## 把这些和运行时连起来的可靠性主张
+
+> **如果每条义务都被证明，运行时就永远不会拒绝。**
+
+运行时恰好在某个言语行为的真值条件不成立时拒绝，而推导器会为每一个这样的行为、在同一份
+日志上产出*路径条件蕴含真值条件*。这条主张是通过用随机的过去和随机的对话去锤打已证明的
+程序，并确认未被证明的程序**确实会**拒绝来测试的。
+
+它在 <Source file="tests/test_soundness.py" />。
+
+## 源码
+
+推导：<Source file="eleph/obligations.py" />。消解：
+<Source file="eleph/verify.py" />。阈值：
+<Source file="eleph/threshold.py" />。

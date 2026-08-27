@@ -378,4 +378,146 @@ export const HOME: Record<Locale, HomeCopy> = {
     ctaButton: 'Primeiros passos',
     ctaGhost: 'Limites honestos',
   },
+
+  'zh-CN': {
+    eyebrow: <>John McCarthy 的 Elephant 2000，已实现</>,
+    title: '一门程序无法说谎的语言。',
+    sub: (
+      <>
+        言语行为、作为唯一状态的历史，以及从程序文本本身推导出来的正确性条件，而不是写在程序旁边的说明。这些条件不需要你来写。编译器直接从程序中读出它们，然后试图推翻。
+      </>
+    ),
+    ctaPrimary: '用在你的智能体上',
+    ctaSecondary: '看看这门语言',
+    bugLabel: 'bug 只差一个词',
+    bugTitle: (
+      <>
+        守卫条件问的是<em>他们是否订过座位</em>，而它本该问<em>他们现在是否持有座位</em>。
+      </>
+    ),
+    bugLede: (
+      <>
+        这是两个不同的问题，差别就在取消上。这是 McCarthy 自己的例子，而整门语言存在的意义，就是让这个差别无法被忽略。
+      </>
+    ),
+    bugPanelNote: <>这里没有任何契约标注。没有断言，没有不变式，没有测试。</>,
+    checkerPanel: '检查器怎么说',
+    checkerNote: <>这不是一个失败的测试：这是一段推翻该义务的历史，被原样打印回来。</>,
+    stateLabel: '过去是唯一的状态',
+    stateTitle: '文法里没有赋值。',
+    stateLede: (
+      <>
+        这不是遗漏。没有东西可以被赋值，因为事实不是被存储的 —— 它是对发生过的事情的一次查询。大象从不遗忘，所以没有东西会被覆盖，也没有东西会与事实脱节。
+      </>
+    ),
+    factPanel: '一个事实，也就是一条关于日志的公式',
+    factNote: <>程序自己说过的话也进入同一份日志，所以可以问它已经说过什么。</>,
+    obligationsLabel: '两条义务，都是 McCarthy 提出的',
+    obligationsTitle: '回答必须为真。承诺必须被兑现。',
+    obligationsLede: (
+      <>
+        每一个 <code>yes</code> 或 <code>no</code> 都必须由日志所蕴含。程序不能承诺它的历史尚未确立的东西，也不能承诺任何一条经过它的路径都无法促成的东西。
+      </>
+    ),
+    cards: [
+      {
+        kicker: '推导而来',
+        title: '十条义务',
+        body: '由 Z3 在完备性阈值处消解，或由编译器在结构上检查。没有人写它们。',
+        to: '/docs/concepts/obligations',
+      },
+      {
+        kicker: '运行时',
+        title: '四种强度的承诺',
+        body: '要约、即时承诺、最终承诺、在某事件之前的承诺 —— 以及一份说明还欠着什么的账本。',
+        to: '/docs/concepts/commitments',
+      },
+      {
+        kicker: '权限',
+        title: '你是否有资格发问',
+        body: '一个如实地把任何客户的余额告诉任何发问者的智能体，一句谎都没说。它依然是一起事故。',
+        to: '/docs/concepts/permission',
+      },
+    ],
+    measuredLabel: '度量出来的，不是宣称出来的',
+    measuredTitle: '这里每一个数字都先由人手工核对过。',
+    stats: [
+      { value: '146', label: '个测试，在 3.11、3.12 和 3.13 上运行', source: 'pytest -q' },
+      {
+        value: '~24k',
+        label: '事件每秒，且随日志增长保持平稳',
+        source: 'bench/scaling.py',
+      },
+      {
+        value: '200',
+        label: '条已发表的 τ-bench 轨迹被重放',
+        source: 'bench/taubench/',
+      },
+      {
+        value: '45/45',
+        label: '带守卫的智能体运行通过数，对照无守卫的 30/45。Claude Haiku 4.5，九个案例，每个五次',
+        source: 'examples/langchain-agent',
+      },
+    ],
+    measuredCards: [
+      {
+        kicker: '性能',
+        title: '每个事件的处理时间恒定',
+        body: '一步递推加上一条局部性引理，并在每次查询时与朴素求值器互相审计。',
+        to: '/docs/performance',
+      },
+      {
+        kicker: '审计',
+        title: 'τ-bench 并不度量它自己的策略',
+        body: '把它的两条规则写成事实，在 200 条轨迹上重放。两条都被发现有歧义，且歧义一直触及标准答案。',
+        to: '/docs/taubench',
+      },
+      {
+        kicker: '实验',
+        title: '同一个智能体，有和没有',
+        body: '提示词与工具完全相同。Haiku 4.5 从 30/45 到 45/45；更早的 Opus 5 套件从 19/21 到 21/21。唯一的差别是守卫。',
+        to: '/docs/integration/langchain',
+      },
+    ],
+    pythonLabel: '在 Python 中使用',
+    pythonTitle: '语言是研究产物。真正上线的是这个。',
+    pythonLede: (
+      <>
+        把规则放在策略文件里、而不是用 Python 写检查逻辑，理由就在下面第二行：你的守卫在凌晨三点执行的规则，和求解器证明过的是同一份产物。
+      </>
+    ),
+    shapeHead: ['形态', '你需要改什么', '你得到什么'],
+    shapes: [
+      ['observer', '什么都不改，你只负责把事件喂给它', '记录中什么为真，以及一份审计'],
+      ['guard', '断言和工具调用都经由它路由', '没有依据的主张会抛出异常，而不是被发出去'],
+      ['language', '用 .eleph 编写处理器', '静态证明'],
+    ],
+    shapesNote: <>由轻到重。</>,
+    doorsLabel: '不管你是哪一种',
+    doorsTitle: '三扇门，而且不是同一扇门。',
+    doors: [
+      {
+        kicker: '你已经在跑智能体',
+        title: '从这里开始',
+        body: '它做什么、不做什么，以及三种形态中哪一种是你的。GPT-4、Claude 或手写循环：守卫里没有任何东西知道 LLM 是什么。',
+        to: '/docs/use/start-here',
+      },
+      {
+        kicker: '你想先看看',
+        title: '快速上手',
+        body: '九行代码，一个 McCarthy 在 1998 年写下的 bug，以及一个会把推翻它的历史打印出来的检查器。',
+        to: '/docs/quickstart',
+      },
+      {
+        kicker: '你想看论证',
+        title: '证明，而非抽查',
+        body: '完备性阈值、局部性引理，以及能推翻每一条主张的实验。',
+        to: '/docs/concepts/completeness',
+      },
+    ],
+    ctaTitle: '从那个引发一切的 bug 开始。',
+    ctaBody: '安装，推导一个九行程序的义务，然后看着检查器产生推翻它的那段历史。',
+    ctaButton: '快速上手',
+    ctaGhost: '诚实的局限',
+  },
 }

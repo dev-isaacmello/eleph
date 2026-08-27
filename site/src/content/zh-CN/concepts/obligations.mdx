@@ -1,0 +1,122 @@
+---
+title: 义务，推导而来
+description: 从程序文本读出的十条正确性条件，由 Z3 或编译器在结构上消解。没有人写它们。
+---
+
+# 义务，推导而来
+
+<p className="lede">
+义务是程序自己的文本所要求的一条正确性条件。你不写它、不标注它、不配置它。编译器从处理器
+里读出它，然后验证器试图推翻它。
+</p>
+
+## 一条义务的形状
+
+每一条推导出来的义务都有相同的三个部分：
+
+| 部分 | 是什么 |
+|---|---|
+| **假设**（`supondo`） | 路径条件 —— 程序为了走到这条语句所选择的分支 |
+| **目标**（`entao`） | 执行那个言语行为对日志作出的主张 |
+| **极性** | 目标必须在每一段这样的历史上成立，还是至少在一段上成立 |
+
+打印出来：
+
+```out
+  linha 17  question(Caller, has_reservation)
+    resposta yes e verdadeira
+      supondo   alguma vez make_reservation(P, F)
+      entao     (make_reservation(P, F) e desde entao nenhum cancel_reservation(P, F))
+```
+
+读作：*在 `make_reservation(P, F)` 曾经发生过的那条路径上，回答 `yes` 主张的是当前存在
+一份有效订座。* Z3 被问的是：有没有哪段历史让假设为真而目标为假。
+
+用 `eleph obligations <文件>` 可以只看它们而不去消解。这个命令存在的意义只有一个：
+**这些都不是人写的。**
+
+## 那十条
+
+| 义务 | 由谁检查 |
+|---|---|
+| 回答为真 | Z3，在完备性阈值处 |
+| 回答确实回应了所问的问题 | Z3 |
+| 即时承诺在说出时即成立 | Z3，基于日志加上该处理器刚刚记录的内容 |
+| 未来承诺是某条路径能够促成的 | Z3，要求该路径把它由假变真 |
+| 参数的类型与声明一致 | 编译器，对每一条事实，无论是否被用到 |
+| 一个要约是某条路径可能兑现的 | Z3 |
+| 通往受保护主题的门没有一扇是没锁的 | 结构性 |
+| 每条路径恰好回答一次 | 结构性 |
+| 每个请求恰好被接受或拒绝一次 | 结构性 |
+| 未清偿和已违背的承诺 | 运行时账本 |
+
+最后一条是唯一不属于静态检查的。关于未来的承诺无法在未来到来之前被消解，所以运行时维护
+一份账本，报告哪些还欠着、哪些已经违背。
+
+## 其中三条，说得细一点
+
+### 回答为真
+
+McCarthy 的第一条公理。每一个 `answer C yes`、`answer C no` 和 `answer C with φ` 在说出
+的那一刻都必须由日志所蕴含。[McCarthy 的 bug](/docs/the-mccarthy-bug) 违反的就是这一条。
+
+### 即时承诺在说出时即成立
+
+`promise C that φ` 主张 φ *现在*为真，所以检查是基于日志**加上该处理器一路走到这里所
+记录的内容**：
+
+```eleph
+on request(Caller, make_reservation(P, F)):
+    if has_reservation(P, F):
+        decline Caller
+    else:
+        record make_reservation(P, F)
+        accept Caller
+        promise Caller that has_reservation(P, F)
+```
+
+上面这条承诺之所以可证，只是因为 `record` 在同一个处理器里先执行了。把 `record` 移到
+`promise` 之后，这条义务就不成立了。
+
+### 未来承诺是可兑现的
+
+`promise C eventually φ` 和 `promise C that φ before e(...)` 在说出时不可能为真 —— 这正是
+它们之所以是未来承诺的原因。编译器改为证明*程序中存在某条路径能够确立 φ*，并且要求那条
+路径把 φ 由假变真：
+
+```out
+  ok  request(C, make_reservation)  linha 46  -  a promessa pode vir a ser cumprida (antes de board(P, F))
+      cumprivel por: request assign_seat > entao l51
+```
+
+那段追踪点出了具体是哪条路径。这项检查的早期版本接受任何可满足的公式，因而是空洞的；这在
+0.2.0 里被修掉了。
+
+<Callout type="limit" title="可兑现性不是活性">
+编译器证明的是存在一条路径。它无法证明来电者会走上那条路径，因为没有任何程序做得到。他们
+不走的话会怎样，那是账本的事。
+</Callout>
+
+## 结构性缺陷
+
+十条里有三条根本到不了求解器。它们是程序形状的性质：
+
+* **每条路径恰好回答一次。** 一个 `question` 处理器里有一条什么都不说的分支，或者回答了
+  两次，都是缺陷。
+* **每个请求恰好被接受或拒绝一次。** 对 `request` 同理。
+* **没有没锁的门。** 同一主题上一个处理器要求 `permitted` 而它旁边那个什么都不要求，就是
+  锁好的前门旁边开着一扇窗。0.3.0 加入；见[权限](/docs/concepts/permission)。
+
+结构性缺陷在求解器运行之前就被报告，并计为失败：
+
+```out
+  X   question(Quem, saldo)  linha 22
+      outro handler sobre este assunto exige permissao e este nao
+```
+
+## 它们从哪里来
+
+推导在 <Source file="eleph/obligations.py" />，消解在
+<Source file="eleph/verify.py" />。把两者连起来的可靠性主张 —— *如果每条义务都被证明，
+运行时就永远不会拒绝* —— 是靠用随机的过去和随机的对话去锤打已证明的程序来测试的，在
+<Source file="tests/test_soundness.py" />。
