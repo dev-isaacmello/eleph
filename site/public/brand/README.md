@@ -6,8 +6,8 @@ sides is a quarter of the mark's height.
 
 | colour | on | hex |
 |---|---|---|
-| accent | paper | `#b5441f` |
-| accent | dark | `#f08a5f` |
+| accent | paper | `#1668c5` |
+| accent | dark | `#71a8ef` |
 | ink | paper | `#1b1917` |
 | paper | ink or accent | `#fffefb` |
 

@@ -26,9 +26,9 @@
   --border-strong: #d2cdc2;
 
   /* The one accent. Elephants are grey; the ink they leave is not. */
-  --accent: #b5441f;
-  --accent-hover: #96371a;
-  --accent-soft: rgba(181, 68, 31, 0.1);
+  --accent: #1668c5;
+  --accent-hover: #1257a5;
+  --accent-soft: rgba(22, 104, 197, 0.1);
   --accent-fg: #ffffff;
 
   --ok: #2f7a41;
@@ -96,9 +96,9 @@
   --border: #2c2a26;
   --border-strong: #3d3a35;
 
-  --accent: #f08a5f;
-  --accent-hover: #f5a381;
-  --accent-soft: rgba(240, 138, 95, 0.13);
+  --accent: #71a8ef;
+  --accent-hover: #94bdf3;
+  --accent-soft: rgba(113, 168, 239, 0.13);
   --accent-fg: #16130f;
 
   --ok: #5fbd74;

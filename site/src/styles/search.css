@@ -7,7 +7,10 @@
   align-items: center;
   gap: 0.5rem;
   flex: 0 1 auto;
-  width: 12.5rem;
+  /* Sized by its own label: the three languages need very different
+     widths, and one compromise number would truncate two of them. */
+  width: auto;
+  max-width: 15rem;
   min-width: 0;
   height: var(--control-h);
   padding: 0 0.5rem 0 0.65rem;
