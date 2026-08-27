@@ -21,9 +21,25 @@ All notable changes to this project are recorded here. The format follows
   it over unverified, which is the failure this project exists to stop. The
   client already knows how to read a file; what it cannot do is run Z3.
 
-* **A skill** (`skills/eleph/SKILL.md`) for the coding assistant of somebody
-  using eleph. It carries the write-check-fix loop and the limits that mean a
-  rule cannot be expressed, so a model stops instead of approximating.
+* **A skill** (`plugins/eleph/skills/eleph/SKILL.md`) for the coding assistant
+  of somebody using eleph. It carries the write-check-fix loop and the limits
+  that mean a rule cannot be expressed, so a model stops instead of
+  approximating.
+
+* **The repository is a plugin marketplace**, so installing both is two
+  commands rather than a clone and a copy:
+
+      /plugin marketplace add dev-isaacmello/eleph
+      /plugin install eleph@eleph
+
+  The plugin carries the skill and the MCP server together, which means the
+  skill arrives with the checker already wired up rather than telling the
+  reader to go and configure one.
+
+  The MCP server is declared in `plugins/eleph/.mcp.json`. The documented
+  filename is `mcp-servers.json`, and that one is not read: with it the
+  component inventory reports zero MCP servers, and with `.mcp.json` it reports
+  one. Tested against the CLI rather than taken from the page.
 
 ### Fixed
 

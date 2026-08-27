@@ -29,7 +29,10 @@ nothing is fetched over the network.
 | `eleph_simulate` | replay these events; what is true, and what would be refused |
 | `eleph_declarations` | what does this policy declare, with each fact expanded |
 
-### Wiring it up
+### Wiring it up by hand
+
+The [plugin below](#two-commands-in-claude-code) does this for you in Claude Code.
+Everywhere else:
 
 <Snippet title="claude_desktop_config.json, .cursor/mcp.json, and most others">
 ```json
@@ -85,26 +88,47 @@ example](/docs/integration/langchain) was found: a policy that was `PROVADO`
 before and after the fix.
 </Callout>
 
-## The skill
+## Two commands, in Claude Code
 
-For Claude Code and Claude Desktop, <Source file="skills/eleph/SKILL.md" />
-carries the procedure rather than the API surface: the loop above, the
-translation from the columns you already have into events and facts, the bare
-atom trap, and the limits that mean a rule cannot be expressed.
+The repository is a plugin marketplace, so there is no cloning and no copying
+files into place:
 
 ```bash
-git clone https://github.com/dev-isaacmello/eleph
-mkdir -p ~/.claude/skills
-cp -r eleph/skills/eleph ~/.claude/skills/
+/plugin marketplace add dev-isaacmello/eleph
+/plugin install eleph@eleph
 ```
+
+That installs **both** halves at once: the skill, and the MCP server above
+already wired up. Nothing to paste into a config file.
+
+```text
+Component inventory
+  Skills (1)  eleph
+  MCP servers (1)  eleph
+
+Projected token cost
+  Always-on:   ~127 tok   added to every session
+```
+
+`/plugin uninstall eleph@eleph` removes it.
+
+### What the skill carries
+
+<Source file="plugins/eleph/skills/eleph/SKILL.md" /> is the procedure rather
+than the API surface: the loop above, the translation from the columns you
+already have into events and facts, the bare atom trap, and the limits that
+mean a rule cannot be expressed.
 
 Its first rule is the one that matters: **never hand over a `.eleph` file that
 has not been through the checker.** With the MCP server installed, it has the
 checker to hand.
 
-For editors without skills, the same file works as a rules file: Cursor reads
+### Editors without plugins
+
+The same file is plain Markdown and works as a rules file. Cursor reads
 `.cursor/rules/`, Copilot reads `.github/copilot-instructions.md`, and several
-tools now read `AGENTS.md`. It is plain Markdown; copy it where yours looks.
+tools now read `AGENTS.md`. Copy it where yours looks, and wire the MCP server
+with the JSON above.
 
 ## Every page as Markdown
 

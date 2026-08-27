@@ -1,0 +1,11 @@
+{
+  "name": "eleph",
+  "description": "Write policies a solver proved. The skill carries the write-check-fix loop; the MCP server runs the checker and hands back the history that breaks your rule.",
+  "version": "0.4.0",
+  "author": {
+    "name": "Isaac Mello"
+  },
+  "homepage": "https://elephlanguage.vercel.app",
+  "repository": "https://github.com/dev-isaacmello/eleph",
+  "license": "MIT"
+}

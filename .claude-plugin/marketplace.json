@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "eleph",
+  "description": "eleph: a language whose programs cannot lie. The skill and the MCP server that proves your policy.",
+  "owner": {
+    "name": "Isaac Mello",
+    "url": "https://github.com/dev-isaacmello"
+  },
+  "plugins": [
+    {
+      "name": "eleph",
+      "source": "./plugins/eleph",
+      "displayName": "eleph",
+      "description": "Write policies a solver proved. Adds the eleph skill and an MCP server whose tools run the checker: it returns the history that breaks your rule, not an opinion about it.",
+      "homepage": "https://elephlanguage.vercel.app",
+      "repository": "https://github.com/dev-isaacmello/eleph",
+      "license": "MIT",
+      "category": "development",
+      "keywords": [
+        "formal-verification",
+        "agent-reliability",
+        "speech-acts",
+        "temporal-logic",
+        "z3",
+        "policy"
+      ]
+    }
+  ]
+}

@@ -29,7 +29,10 @@ em disco, nada é buscado na rede.
 | `eleph_simulate` | reexecute estes eventos; o que é verdade, e o que seria recusado |
 | `eleph_declarations` | o que esta política declara, com cada fato expandido |
 
-### Ligando
+### Ligando à mão
+
+O [plugin abaixo](#dois-comandos-no-claude-code) faz isso por você no Claude Code.
+Nos outros lugares:
 
 <Snippet title="claude_desktop_config.json, .cursor/mcp.json, e a maioria dos outros">
 ```json
@@ -85,26 +88,47 @@ LangChain](/docs/integration/langchain) apareceu: numa política que estava
 `PROVADO` antes e depois da correção.
 </Callout>
 
-## A skill
+## Dois comandos, no Claude Code
 
-Para Claude Code e Claude Desktop, o <Source file="skills/eleph/SKILL.md" />
-carrega o procedimento em vez da superfície da API: o laço acima, a tradução das
-colunas que você já tem para eventos e fatos, a armadilha do átomo nu, e os
-limites que significam que uma regra não é expressável.
+O repositório é um marketplace de plugins, então não tem clonar nem copiar
+arquivo para lugar nenhum:
 
 ```bash
-git clone https://github.com/dev-isaacmello/eleph
-mkdir -p ~/.claude/skills
-cp -r eleph/skills/eleph ~/.claude/skills/
+/plugin marketplace add dev-isaacmello/eleph
+/plugin install eleph@eleph
 ```
+
+Isso instala as **duas** metades de uma vez: a skill, e o servidor MCP acima já
+ligado. Nada para colar em arquivo de configuração.
+
+```text
+Component inventory
+  Skills (1)  eleph
+  MCP servers (1)  eleph
+
+Projected token cost
+  Always-on:   ~127 tok   added to every session
+```
+
+`/plugin uninstall eleph@eleph` remove.
+
+### O que a skill carrega
+
+O <Source file="plugins/eleph/skills/eleph/SKILL.md" /> é o procedimento em vez
+da superfície da API: o laço acima, a tradução das colunas que você já tem para
+eventos e fatos, a armadilha do átomo nu, e os limites que significam que uma
+regra não é expressável.
 
 A primeira regra dela é a que importa: **nunca entregar um arquivo `.eleph` que
 não passou pelo verificador.** Com o servidor MCP instalado, ela tem o
 verificador à mão.
 
-Para editores sem skills, o mesmo arquivo serve como arquivo de regras: o Cursor
-lê `.cursor/rules/`, o Copilot lê `.github/copilot-instructions.md`, e várias
-ferramentas já leem `AGENTS.md`. É Markdown puro; copie para onde o seu procura.
+### Editores sem plugins
+
+O mesmo arquivo é Markdown puro e serve como arquivo de regras. O Cursor lê
+`.cursor/rules/`, o Copilot lê `.github/copilot-instructions.md`, e várias
+ferramentas já leem `AGENTS.md`. Copie para onde o seu procura, e ligue o
+servidor MCP com o JSON acima.
 
 ## Cada página como Markdown
 

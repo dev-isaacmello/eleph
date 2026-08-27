@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "eleph": {
+      "command": "uvx",
+      "args": ["--from", "eleph[mcp]", "eleph-mcp"]
+    }
+  }
+}
