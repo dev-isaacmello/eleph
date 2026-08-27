@@ -17,6 +17,23 @@ class TExpr:
 
 
 @dataclass(frozen=True)
+class Bound:
+    """A constraint on a numeric field of an event, tested as it happens.
+
+    `charged(U, C, amount > 100)` reads the field at the instant the event
+    occurs, which is what keeps the last occurrence abstraction intact: the
+    comparison is part of the atom's identity, not a separate fact that could
+    change underneath it.
+    """
+    field: str
+    op: str
+    n: int
+
+    def __str__(self):
+        return f"{self.field} {self.op} {self.n}"
+
+
+@dataclass(frozen=True)
 class Ref(TExpr):
     """`make_reservation(P, F)` -- a bare reference.
 
@@ -174,10 +191,16 @@ class Promise(Stmt):
         promise C that phi                 -- already true when said
         promise C eventually phi           -- standing obligation
         promise C that phi before E(...)   -- obligation with a deadline
+        offer C that phi                   -- willing, not yet owing
+
+    An offer is the eighth of McCarthy's speech acts and the weakest: it is not
+    a debt, because nobody has taken it up. What it does owe is honesty about
+    what the program could do. Offering what no path through the program can
+    bring about is a lie told in the future tense.
     """
     target: str
     expr: TExpr
-    mode: str = "now"                 # now | eventually | before
+    mode: str = "now"                 # now | eventually | before | offer
     deadline: Optional['Ref'] = None
     line: int = 0
 
@@ -192,10 +215,17 @@ class Release(Stmt):
 
 # ------------------------------------------------------------ declarations
 
+NUMBER = "Number"
+
+
 @dataclass(frozen=True)
 class Param:
     name: str
     sort: str = "Thing"
+
+    @property
+    def numeric(self) -> bool:
+        return self.sort == NUMBER
 
 
 @dataclass
@@ -230,12 +260,20 @@ class FactDecl:
 
 @dataclass
 class Handler:
-    """`on question(C, has_reservation(P, F)): ...`"""
+    """`on question(C, has_reservation(P, F)) permitted may_ask(C, P): ...`
+
+    The optional permission is McCarthy's eighth speech act, and it answers a
+    question the rest of the language cannot: not whether an answer is true,
+    but whether this particular party was entitled to ask. A support agent
+    that truthfully reports any customer's balance to whoever asks has told no
+    lie at all.
+    """
     performative: str          # question | request
     caller: str                # variable bound to the other party
     subject: Ref               # the formula asked, or the action requested
     body: List[Stmt]
     line: int = 0
+    permission: Optional[Ref] = None
 
 
 @dataclass

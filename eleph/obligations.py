@@ -79,10 +79,46 @@ class Deriver:
         self.out = Analysis()
 
     def run(self) -> Analysis:
+        self.check_every_fact_typechecks()
         self.out.paths = self.world_paths()
+        self.check_no_unguarded_door()
         for h in self.prog.handlers:
             self.handler(h)
         return self.out
+
+    def check_every_fact_typechecks(self):
+        """Resolve every declared fact, used or not.
+
+        Resolution is lazy, so a fact no handler mentions was never checked at
+        all. A policy file is read by people as a statement of the rules, and a
+        rule with a type error in it that nobody notices because nothing calls
+        it is worse than no rule.
+        """
+        for f in self.prog.facts:
+            env = {p.name: p.sort for p in f.params}
+            self.res.resolve(f.body, env)
+
+    def check_no_unguarded_door(self):
+        """If one door onto a subject is locked, every door must be.
+
+        A permission on one handler and none on its neighbour is not a policy,
+        it is a locked front door beside an open window. This is exactly the
+        kind of thing nobody notices in review and everybody notices in an
+        incident report.
+        """
+        doors = {}
+        for h in self.prog.handlers:
+            doors.setdefault(h.subject.name, []).append(h)
+        for subject, handlers in doors.items():
+            locked = [h for h in handlers if h.permission is not None]
+            open_ = [h for h in handlers if h.permission is None]
+            if locked and open_:
+                for h in open_:
+                    self.out.structural.append(Structural(
+                        "unguarded-door",
+                        f"{h.performative}({h.caller}, {subject})", h.line,
+                        f"outro handler de {subject} exige permissao "
+                        f"(linha {locked[0].line}) e este nao exige nenhuma"))
 
     # ------------------------------------------------------------ handlers
     def env_of(self, h: A.Handler) -> dict:
@@ -101,6 +137,12 @@ class Deriver:
         env = self.env_of(h)
         label = f"{h.performative}({h.caller}, {h.subject.name})"
 
+        # Everything this handler owes, it owes only when the caller was
+        # entitled to ask. The permission joins the path condition rather than
+        # being checked separately, so it is proved with the rest.
+        gate = ([Timed(self.res.resolve(h.permission, env), 0)]
+                if h.permission is not None else [])
+
         if h.performative == "question":
             asked = self.res.resolve(h.subject, env)
             self.check_responsive(h, label)
@@ -111,7 +153,7 @@ class Deriver:
         # the incoming utterance is itself part of the history
         entry = self.speech(h.performative if h.performative == "request"
                             else "ask", h.caller, h.subject, env)
-        self.walk(h.body, [], (entry,), h, label, asked, env)
+        self.walk(h.body, gate, (entry,), h, label, asked, env)
 
     def speech(self, performative, party, subject: A.Ref, env) -> COcc:
         """The synthetic event under which an utterance is logged."""
@@ -209,12 +251,15 @@ class Deriver:
                 assumptions=list(gamma), goal=Timed(phi, len(appended)),
                 appended=appended))
         else:
-            when = ("em algum momento" if s.mode == "eventually"
-                    else f"antes de {s.deadline.name}({', '.join(s.deadline.args)})")
+            when = ("se aceita" if s.mode == "offer"
+                    else "em algum momento" if s.mode == "eventually"
+                    else f"antes de {s.deadline.name}({', '.join(str(a) for a in s.deadline.args)})")
+            word = "oferece" if s.mode == "offer" else "promete"
             self.out.obligations.append(Obligation(
                 kind="promise-dischargeable", handler=label, line=s.line,
-                title=f"a promessa pode vir a ser cumprida ({when})",
-                detail=(f"o programa promete {show(phi)} {when}, mas nenhum "
+                title=(f"a oferta e honesta ({when})" if s.mode == "offer"
+                       else f"a promessa pode vir a ser cumprida ({when})"),
+                detail=(f"o programa {word} {show(phi)} {when}, mas nenhum "
                         f"caminho do programa chega a estabelecer isso"),
                 assumptions=[], goal=Timed(phi, 0),
                 appended=(), polarity="satisfiable",

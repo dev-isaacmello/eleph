@@ -34,7 +34,8 @@ from . import ast as A
 from .core import PARTY, THING, Resolver, show, subst_vars
 from .obligations import derive
 from .parser import parse
-from .runtime import VOW, Commitment, Event, Machine, Refusal
+from .runtime import (VOW, Commitment, Event, Machine, NotPermitted,
+                      Refusal)
 from .store import Store
 from .verify import verify
 

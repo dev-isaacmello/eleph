@@ -16,8 +16,10 @@ from typing import List, Optional
 import z3
 
 from . import ast as A
+from . import ast as _ast
 from .core import (CExpr, COcc, COnce, CSinceNot, CCount, CExists, CCountOver,
-                   CNot, CAnd, COr, CLit, PARTY, THING, subst_vars, pretty)
+                   CNot, CAnd, COr, CLit, NUMBER, PARTY, THING, subst_vars,
+                   pretty)
 from .obligations import Obligation, Analysis
 from .threshold import Threshold, compute as compute_threshold
 
@@ -92,6 +94,11 @@ class Encoder:
             srt, cs = z3.EnumSort(name + self.ns, labels)
             self.sorts[name] = srt
             self.elems[name] = list(cs)
+        # A numeric field is not drawn from a finite universe of names. It is
+        # a value the solver picks in order to satisfy or defeat a comparison,
+        # so it gets integers rather than an enumeration.
+        self.sorts[NUMBER] = z3.IntSort()
+        self.elems[NUMBER] = []
 
         self.sortof = {}
         for e in exprs:
@@ -114,7 +121,8 @@ class Encoder:
             ev = self.prog.event(e.name)
             if ev:
                 for actual, param in zip(e.args, ev.params):
-                    self.sortof.setdefault(actual, param.sort)
+                    if isinstance(actual, str):
+                        self.sortof.setdefault(actual, param.sort)
         for attr in ("arg", "left", "right", "body"):
             child = getattr(e, attr, None)
             if isinstance(child, CExpr):
@@ -145,8 +153,10 @@ class Encoder:
             self.facts.append(self.kind[i] == self.index[atom.name])
             ev = self.prog.event(atom.name)
             for j, a in enumerate(atom.args):
-                self.facts.append(
-                    self.slot[(i, j, ev.params[j].sort)] == self.const(a))
+                slot = self.slot[(i, j, ev.params[j].sort)]
+                self.facts.append(_cmp(slot, a.op, a.n)
+                                  if isinstance(a, _ast.Bound)
+                                  else slot == self.const(a))
 
     # ---------------------------------------------------------- semantics
     def occ(self, i, name, args):
@@ -155,7 +165,11 @@ class Encoder:
         ev = self.prog.event(name)
         parts = [self.kind[i] == self.index[name]]
         for j, a in enumerate(args):
-            parts.append(self.slot[(i, j, ev.params[j].sort)] == self.const(a))
+            slot = self.slot[(i, j, ev.params[j].sort)]
+            if isinstance(a, _ast.Bound):
+                parts.append(_cmp(slot, a.op, a.n))
+            else:
+                parts.append(slot == self.const(a))
         return _and(parts)
 
     def at(self, e, i):
@@ -232,6 +246,9 @@ class Encoder:
             for j, param in enumerate(ev.params):
                 val = model.eval(self.slot[(i, j, param.sort)],
                                  model_completion=True)
+                if param.sort == NUMBER:
+                    shown.append(f"{param.name}={val}")
+                    continue
                 hit = named.get(str(val))
                 shown.append("=".join(hit) if hit else _plain(val))
             if i < self.n:

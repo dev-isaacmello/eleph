@@ -34,6 +34,7 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 from typing import Dict, Optional, Set, Tuple
 
+from . import ast as _ast
 from .core import (CExpr, COcc, COnce, CSinceNot, CCount, CExists, CCountOver,
                    CNot, CAnd, COr, CLit)
 
@@ -46,7 +47,9 @@ def free_vars(e: CExpr) -> Tuple[str, ...]:
     def go(x, bound):
         if isinstance(x, (COcc, CCount)):
             for a in x.args:
-                if a not in bound and a not in out:
+                # a numeric comparison binds nothing: it is part of the
+                # pattern, not a variable the key is built from
+                if isinstance(a, str) and a not in bound and a not in out:
                     out.append(a)
         elif isinstance(x, (COnce, CNot)):
             go(x.arg, bound)
@@ -108,6 +111,13 @@ def match(atom: COcc, name: str, args: Tuple[str, ...]) -> Optional[dict]:
         return None
     binding = {}
     for var, value in zip(atom.args, args):
+        if isinstance(var, _ast.Bound):
+            try:
+                if not compare(int(value), var.op, var.n):
+                    return None
+            except (TypeError, ValueError):
+                return None
+            continue
         if binding.setdefault(var, value) != value:
             return None          # a repeated variable must agree with itself
     return binding

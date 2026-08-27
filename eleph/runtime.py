@@ -15,7 +15,7 @@ from typing import List, Optional, Tuple
 
 from . import ast as A
 from .core import (COcc, COnce, CSinceNot, CCount, CExists, CCountOver,
-                   CNot, CAnd, COr, CLit, CExpr, PARTY, THING,
+                   CNot, CAnd, COr, CLit, CExpr, NUMBER, PARTY, THING,
                    Resolver, speech_event, subst_vars, show, pretty)
 from .incremental import Index
 from .store import Store
@@ -60,6 +60,11 @@ class Refusal(Exception):
     """The runtime will not perform a speech act it cannot ground."""
 
 
+class NotPermitted(Refusal):
+    """This party was not entitled to ask. Failing closed is the only safe
+    default: an answer withheld is recoverable, an answer leaked is not."""
+
+
 class CorruptCommitment(Exception):
     """The log remembers a promise the program no longer contains."""
 
@@ -90,6 +95,10 @@ class Machine:
         for e in self.queryable():
             self.index.track(e)
 
+    def permissions(self):
+        return [h.permission for h in self.prog.handlers
+                if h.permission is not None]
+
     def queryable(self):
         """Every expression this program could ever be asked about.
 
@@ -101,6 +110,8 @@ class Machine:
             env = self.env_of(h)
             try:
                 out.append(self.res.resolve(h.subject, env))
+                if h.permission is not None:
+                    out.append(self.res.resolve(h.permission, env))
             except Exception:
                 continue
             for e in self._exprs(h.body):
@@ -129,6 +140,8 @@ class Machine:
             if not decl:
                 continue
             for value, param in zip(ev.args, decl.params):
+                if param.sort == NUMBER:
+                    continue          # a quantity is not a thing to quantify over
                 if (param.sort == sort or sort == THING) and value not in seen:
                     seen.append(value)
         return seen
@@ -137,10 +150,23 @@ class Machine:
         if isinstance(e, COcc):
             if not 0 <= i < len(self.log):
                 return False
-            ev = self.log[i]
-            return (ev.name == e.name
-                    and ev.args == tuple(b.get(a, a) for a in e.args))
+            return self.fits(self.log[i], e, b)
         return self.holds(e, i, b)
+
+    def fits(self, ev: "Event", atom: COcc, b: dict) -> bool:
+        """Does this event match the pattern, comparisons and all?"""
+        if ev.name != atom.name or len(ev.args) != len(atom.args):
+            return False
+        for actual, pattern in zip(ev.args, atom.args):
+            if isinstance(pattern, A.Bound):
+                try:
+                    if not self.compare(int(actual), pattern.op, pattern.n):
+                        return False
+                except (TypeError, ValueError):
+                    return False
+            elif actual != b.get(pattern, pattern):
+                return False
+        return True
 
     def holds(self, e, t, b):
         """Truth of `e` given the log through position `t` inclusive."""
@@ -156,9 +182,8 @@ class Machine:
                 and not any(self.at(e.right, j, b) for j in range(i + 1, t + 1))
                 for i in range(t + 1))
         if isinstance(e, CCount):
-            args = tuple(b.get(a, a) for a in e.args)
-            n = sum(1 for i in range(t + 1)
-                    if self.log[i].name == e.name and self.log[i].args == args)
+            atom = COcc(e.name, e.args)
+            n = sum(1 for i in range(t + 1) if self.fits(self.log[i], atom, b))
             return self.compare(n, e.op, e.n)
         if isinstance(e, CExists):
             return any(self.holds(e.body, t, dict(b, **{e.var: d}))
@@ -311,6 +336,13 @@ class Machine:
                    speaker, name, args, None)
 
         env = self.env_of(h)
+        if h.permission is not None and self.enforce:
+            allowed = self.res.resolve(h.permission, env)
+            if not self.now(allowed, b):
+                raise NotPermitted(
+                    f"{speaker} nao tem permissao para {performative} "
+                    f"{name}({', '.join(args)}): o registro nao sustenta "
+                    f"{show(subst_vars(allowed, b))}")
         asked = (self.res.resolve(h.subject, env) if performative == "question"
                  else None)
         self.exec(h.body, b, asked, h, env)
@@ -376,6 +408,13 @@ class Machine:
             self.utter("promise", party, h.subject.name,
                        [b.get(a, a) for a in h.subject.args],
                        "    programa: prometo, e ja esta feito")
+            return
+
+        if s.mode == "offer":
+            # an offer is not a debt: nobody has taken it up
+            self.utter("offer", party, h.subject.name,
+                       [b.get(a, a) for a in h.subject.args],
+                       f"    programa: ofereco -- {show(subst_vars(phi, b))}")
             return
 
         deadline = (self.res.resolve(s.deadline, env, instant=True)

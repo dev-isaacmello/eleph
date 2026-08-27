@@ -13,6 +13,8 @@ KEYWORDS = {
     "spoke", "about",
     # accomplishment specs: promises about the future
     "eventually", "before", "release", "from",
+    # authority: who is entitled to ask
+    "permitted", "offer",
 }
 
 _TOKEN_RE = re.compile(r"""

@@ -12,9 +12,10 @@ For embedding in a Python system, start with `Policy`:
 """
 
 from .guard import Guard, Policy, Ungrounded, UnknownName, VerifyReport
-from .runtime import Commitment, Event, Machine, Refusal
+from .runtime import Commitment, Event, Machine, NotPermitted, Refusal
 from .store import Store
 
 __all__ = ["Policy", "Guard", "VerifyReport", "Ungrounded", "UnknownName",
-           "Commitment", "Event", "Machine", "Refusal", "Store"]
+           "Commitment", "Event", "Machine", "NotPermitted", "Refusal",
+           "Store"]
 __version__ = "0.2.0"

@@ -14,6 +14,7 @@ from . import ast as A
 
 PARTY = "Party"          # built-in sort: whoever the program is talking to
 THING = "Thing"          # default sort when nothing is annotated
+NUMBER = "Number"        # built-in sort: a field compared as the event happens
 
 
 class CExpr:
@@ -196,14 +197,31 @@ class Resolver:
         raise ResolveError(f"{r.name!r} nao e evento nem fato declarado")
 
     # ------------------------------------------------------------- checks
-    def check_args(self, ref: A.Ref, params, env, subst) -> Tuple[str, ...]:
+    def check_args(self, ref: A.Ref, params, env, subst) -> Tuple:
         if len(ref.args) != len(params):
             raise ResolveError(
                 f"{ref.name} espera {len(params)} argumentos, "
                 f"recebeu {len(ref.args)}")
         out = []
         for actual, param in zip(ref.args, params):
+            if isinstance(actual, A.Bound):
+                if param.sort != NUMBER:
+                    raise ResolveError(
+                        f"em {ref.name}: {actual.field!r} compara um valor, "
+                        f"mas {param.name!r} e do tipo {param.sort}, nao "
+                        f"{NUMBER}")
+                if actual.field != param.name:
+                    raise ResolveError(
+                        f"em {ref.name}: o campo nessa posicao chama-se "
+                        f"{param.name!r}, nao {actual.field!r}")
+                out.append(actual)
+                continue
             name = subst.get(actual, actual)
+            if param.sort == NUMBER:
+                raise ResolveError(
+                    f"em {ref.name}: {param.name!r} e numerico, entao so "
+                    f"aceita uma comparacao (ex: {param.name} > 100), nao a "
+                    f"variavel {name!r}")
             self.expect_sort(name, param.sort, env,
                              f"no argumento {param.name!r} de {ref.name}")
             out.append(name)
@@ -218,7 +236,7 @@ class Resolver:
                 f"{context}: {name!r} e do tipo {have}, esperava {wanted}")
 
     def known_sort(self, name):
-        if name in (PARTY, THING):
+        if name in (PARTY, THING, NUMBER):
             return
         if name not in [s.name for s in self.prog.sorts]:
             raise ResolveError(f"tipo {name!r} nao declarado (use 'sort {name}')")
@@ -229,11 +247,12 @@ class Resolver:
 def subst_vars(e: CExpr, mapping: dict) -> CExpr:
     """Rename free variables. Used to expand a quantifier over a domain."""
     def go(x):
+        rename = lambda args: tuple(
+            a if not isinstance(a, str) else mapping.get(a, a) for a in args)
         if isinstance(x, COcc):
-            return COcc(x.name, tuple(mapping.get(a, a) for a in x.args))
+            return COcc(x.name, rename(x.args))
         if isinstance(x, CCount):
-            return CCount(x.name, tuple(mapping.get(a, a) for a in x.args),
-                          x.op, x.n)
+            return CCount(x.name, rename(x.args), x.op, x.n)
         if isinstance(x, COnce):
             return COnce(go(x.arg))
         if isinstance(x, CNot):
@@ -267,7 +286,7 @@ def variables(e: CExpr):
     out = set()
     for node in _walk(e):
         if isinstance(node, (COcc, CCount)):
-            out |= set(node.args)
+            out |= {a for a in node.args if isinstance(a, str)}
         if isinstance(node, (CExists, CCountOver)):
             out.discard(node.var)
     return out
@@ -279,13 +298,14 @@ def events_used(e: CExpr):
 
 def show(e: CExpr) -> str:
     if isinstance(e, COcc):
-        return f"{pretty(e.name)}({', '.join(e.args)})"
+        return f"{pretty(e.name)}({', '.join(str(a) for a in e.args)})"
     if isinstance(e, COnce):
         return f"alguma vez {show(e.arg)}"
     if isinstance(e, CSinceNot):
         return f"({show(e.left)} e desde entao nenhum {show(e.right)})"
     if isinstance(e, CCount):
-        return f"count {e.name}({', '.join(e.args)}) {e.op} {e.n}"
+        args = ", ".join(str(a) for a in e.args)
+        return f"count {e.name}({args}) {e.op} {e.n}"
     if isinstance(e, CExists):
         return f"existe {e.var}: {e.sort} com {show(e.body)}"
     if isinstance(e, CCountOver):

@@ -112,10 +112,11 @@ class Parser:
         self.eat_punct(",")
         subject = self.ref()
         self.eat_punct(")")
+        permission = self.ref() if self.accept("PERMITTED") else None
         self.eat_punct(":")
         self.eat("NEWLINE")
         body = self.block()
-        return A.Handler(perf, caller, subject, body, line)
+        return A.Handler(perf, caller, subject, body, line, permission)
 
     # --------------------------------------------------------- statements
     def block(self):
@@ -153,6 +154,13 @@ class Parser:
             return node(target, atom, tok.line)
         if self.at("PROMISE"):
             return self.promise_stmt()
+        if self.at("OFFER"):
+            line = self.eat("OFFER").line
+            target = self.eat("IDENT").value
+            self.eat("THAT", "'that'")
+            expr = self.texpr()
+            self.eat("NEWLINE")
+            return A.Promise(target, expr, "offer", None, line)
         if self.at("RELEASE"):
             line = self.eat("RELEASE").line
             target = self.eat("IDENT").value
@@ -303,7 +311,12 @@ class Parser:
         return A.Ref(name, tuple(args))
 
     def arg(self):
-        return self.eat("IDENT", "argumento").value
+        """A variable, or a constraint on a numeric field of this event."""
+        name = self.eat("IDENT", "argumento").value
+        if self.at("OP"):
+            op = self.eat("OP").value
+            return A.Bound(name, op, int(self.eat("NUMBER").value))
+        return name
 
     # ------------------------------------------------------ punct helpers
     def at_punct(self, ch):
