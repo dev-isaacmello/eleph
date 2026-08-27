@@ -18,7 +18,7 @@ from langchain_core.tools import tool
 from eleph import Policy, Ungrounded
 
 HERE = pathlib.Path(__file__).parent
-MODEL = "claude-opus-5"
+DEFAULT_MODEL = "claude-opus-5"
 
 SYSTEM = """Voce e um atendente de suporte de uma assinatura mensal.
 
@@ -97,18 +97,20 @@ def make_tools(backend, guard=None):
     return [consultar_conta, cancelar_assinatura, emitir_reembolso]
 
 
-def default_model():
+def default_model(name: str = None):
     """Claude when there is a key, a scripted stand in otherwise."""
     if os.environ.get("ELEPH_OFFLINE") or not os.environ.get("ANTHROPIC_API_KEY"):
         from scripted import ScriptedModel
         return ScriptedModel()
     from langchain_anthropic import ChatAnthropic
-    return ChatAnthropic(model=MODEL, max_tokens=2048)
+    return ChatAnthropic(model=name or DEFAULT_MODEL, max_tokens=2048)
 
 
 def build(backend, guard=None, model=None):
     """The agent under test. `guard=None` is how these are usually shipped."""
-    return create_agent(model or default_model(), make_tools(backend, guard),
+    if model is None or isinstance(model, str):
+        model = default_model(model)
+    return create_agent(model, make_tools(backend, guard),
                         system_prompt=SYSTEM)
 
 

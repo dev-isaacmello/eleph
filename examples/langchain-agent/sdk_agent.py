@@ -38,7 +38,7 @@ from claude_agent_sdk import (AssistantMessage, ClaudeAgentOptions,
 from eleph import Ungrounded
 
 SERVER = "suporte"
-MODEL = "claude-opus-5"
+DEFAULT_MODEL = "claude-opus-5"
 
 
 @contextlib.contextmanager
@@ -116,11 +116,11 @@ def make_server(backend, guard=None, refusals=None):
                             emitir_reembolso])
 
 
-def _options(server, system_prompt: str) -> ClaudeAgentOptions:
+def _options(server, system_prompt: str, model: str) -> ClaudeAgentOptions:
     names = [f"mcp__{SERVER}__{t}" for t in
              ("consultar_conta", "cancelar_assinatura", "emitir_reembolso")]
     return ClaudeAgentOptions(
-        model=MODEL,
+        model=model,
         system_prompt=system_prompt,
         mcp_servers={SERVER: server},
         allowed_tools=names,
@@ -134,7 +134,7 @@ def _options(server, system_prompt: str) -> ClaudeAgentOptions:
     )
 
 
-async def _ask(backend, guard, system_prompt, message) -> dict:
+async def _ask(backend, guard, system_prompt, message, model) -> dict:
     refusals = []
     server = make_server(backend, guard, refusals)
     calls, replies, cost = [], [], None
@@ -145,7 +145,8 @@ async def _ask(backend, guard, system_prompt, message) -> dict:
         # lose a run in a comparison harness
         async with contextlib.aclosing(
                 query(prompt=message,
-                      options=_options(server, system_prompt))) as stream:
+                      options=_options(server, system_prompt,
+                                       model))) as stream:
             async for msg in stream:
                 if isinstance(msg, AssistantMessage):
                     for block in msg.content:
@@ -160,6 +161,8 @@ async def _ask(backend, guard, system_prompt, message) -> dict:
             "refusals": len(refusals), "cost": cost}
 
 
-def ask(backend, guard, system_prompt: str, message: str) -> dict:
+def ask(backend, guard, system_prompt: str, message: str,
+        model: Optional[str] = None) -> dict:
     """One turn against the plan. Synchronous, for the comparison harness."""
-    return asyncio.run(_ask(backend, guard, system_prompt, message))
+    return asyncio.run(_ask(backend, guard, system_prompt, message,
+                            model or DEFAULT_MODEL))

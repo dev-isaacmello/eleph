@@ -32,7 +32,7 @@ def once(scenario, guarded, policy, model, via_sdk=False):
         if via_sdk:
             from agent import SYSTEM
             from sdk_agent import ask
-            result = ask(backend, guard, SYSTEM, scenario.message)
+            result = ask(backend, guard, SYSTEM, scenario.message, model)
             reply, refusals = result["reply"], result["refusals"]
         else:
             messages = run(build(backend, guard, model), scenario.message)
@@ -56,6 +56,8 @@ def main():
                     help="Claude via LangChain e API key (pay as you go)")
     ap.add_argument("--sdk", action="store_true",
                     help="Claude via Agent SDK e OAuth (consome sua assinatura)")
+    ap.add_argument("--model", default=None,
+                    help="ex: claude-haiku-4-5. Padrao: claude-opus-5")
     ap.add_argument("-n", "--runs", type=int, default=1,
                     help="rodadas por cenario, para medir taxa e nao anedota")
     ap.add_argument("--no-color", action="store_true")
@@ -71,8 +73,9 @@ def main():
     report = policy.verify()
     print(f"\n  politica: policy.eleph")
     print(f"  {c(DIM, report.summary())}")
-    mode = ("Claude via Agent SDK, OAuth da assinatura" if args.sdk
-            else "Claude via LangChain, API key" if args.live
+    named = f", {args.model}" if args.model else ""
+    mode = ("Claude via Agent SDK, OAuth da assinatura" + named if args.sdk
+            else "Claude via LangChain, API key" + named if args.live
             else "modelo roteirizado (ilustracao)")
     print(f"  modelo: {mode}, {args.runs} rodada(s) por cenario")
     if not (args.live or args.sdk):
@@ -95,7 +98,8 @@ def main():
         for guarded in (False, True):
             good = 0
             for _ in range(args.runs):
-                r = once(scenario, guarded, policy, None, via_sdk=args.sdk)
+                r = once(scenario, guarded, policy, args.model,
+                         via_sdk=args.sdk)
                 good += r["ok"]
                 all_refusals += r["refusals"]
                 if r["error"]:
