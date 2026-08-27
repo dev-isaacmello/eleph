@@ -15,6 +15,7 @@ class Charge:
     id: str
     amount: float
     refunded: bool = False
+    after_cancel: bool = False   # caiu depois do cancelamento do cliente
 
 
 @dataclass

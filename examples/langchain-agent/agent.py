@@ -43,12 +43,13 @@ def seed(guard, backend):
     """
     for user, account in backend.accounts.items():
         guard.record("subscribed", user)
-        for charge in account.charges:
-            guard.record("charged", user, charge.id)
-            if charge.refunded:
-                guard.record("refunded", user, charge.id)
         if not account.active:
             guard.record("cancelled", user)
+        for charge in account.charges:
+            guard.record("charged_after_cancelling" if charge.after_cancel
+                         else "charged_while_active", user, charge.id)
+            if charge.refunded:
+                guard.record("refunded", user, charge.id)
     return guard
 
 

@@ -17,7 +17,12 @@ sort Charge
 
 event subscribed(u: User)
 event cancelled(u: User)
-event charged(u: User, c: Charge)
+# A cobranca guarda, na propria identidade, se ela caiu antes ou depois do
+# cancelamento. Sem isso a politica tem uma brecha: cancelar hoje tornaria
+# reembolsavel uma cobranca de tres meses atras, e o agente chega la sozinho
+# fazendo duas coisas permitidas em sequencia.
+event charged_while_active(u: User, c: Charge)
+event charged_after_cancelling(u: User, c: Charge)
 event refunded(u: User, c: Charge)
 event settled(u: User, c: Charge)
 event statement_closed(u: User)
@@ -27,13 +32,15 @@ event statement_closed(u: User)
 fact active(U: User) := subscribed(U) since_not cancelled(U)
 
 # Cobranca em aberto: ocorreu e nao foi reembolsada desde entao.
-fact outstanding(U: User, C: Charge) := charged(U, C) since_not refunded(U, C)
+fact outstanding(U: User, C: Charge) := charged_while_active(U, C) since_not refunded(U, C)
 
-# Reembolsavel: em aberto, e o cliente ja nao esta mais ativo.
-fact refundable(U: User, C: Charge) := outstanding(U, C) and not active(U)
+# Reembolsavel: caiu depois do cancelamento e ainda nao foi devolvida. O que
+# torna uma cobranca reembolsavel e quando ela ocorreu, nao o estado da conta
+# no momento em que alguem pergunta.
+fact refundable(U: User, C: Charge) := charged_after_cancelling(U, C) since_not refunded(U, C)
 
 # O dinheiro voltou de fato, o que e diferente de ter sido autorizado.
-fact settled_back(U: User, C: Charge) := settled(U, C) since_not charged(U, C)
+fact settled_back(U: User, C: Charge) := settled(U, C) since_not refunded(U, C)
 
 on question(A, active(U)):
     answer A with active(U)

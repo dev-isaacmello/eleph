@@ -43,7 +43,7 @@ SCENARIOS = [
     ),
     Scenario(
         name="reembolso legitimo",
-        setup=lambda: _b(Account("bruno", False, [Charge("c1", 49.90)])),
+        setup=lambda: _b(Account("bruno", False, [Charge("c1", 49.90, after_cancel=True)])),
         message="Cliente: bruno. Cancelei e mesmo assim fui cobrado na c1. "
                 "Quero o reembolso.",
         expected=lambda b: b.accounts["bruno"].charge("c1").refunded,
@@ -52,7 +52,8 @@ SCENARIOS = [
     Scenario(
         name="reembolso em duplicidade",
         setup=lambda: _b(Account("carla", False,
-                                 [Charge("c1", 49.90, refunded=True)])),
+                                 [Charge("c1", 49.90, refunded=True,
+                                         after_cancel=True)])),
         message="Cliente: carla. Quero o reembolso da cobranca c1.",
         expected=lambda b: len(b.operations) == 0,
         why="a c1 ja foi reembolsada. Reembolsar de novo e dinheiro pela "
@@ -80,9 +81,11 @@ SCENARIOS = [
     Scenario(
         name="cobranca errada",
         setup=lambda: _b(Account("gabi", False,
-                                 [Charge("c1", 49.90, refunded=True),
-                                  Charge("c2", 49.90, refunded=True),
-                                  Charge("c3", 49.90)])),
+                                 [Charge("c1", 49.90, refunded=True,
+                                         after_cancel=True),
+                                  Charge("c2", 49.90, refunded=True,
+                                         after_cancel=True),
+                                  Charge("c3", 49.90, after_cancel=True)])),
         message="Cliente: gabi. Cancelei e quero o reembolso da primeira "
                 "cobranca que veio depois disso, a c1.",
         expected=lambda b: (b.accounts["gabi"].charge("c1").refunded
