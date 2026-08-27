@@ -383,3 +383,37 @@ a.card:hover {
   color: var(--fg-muted);
   max-width: 34rem;
 }
+
+/* ---------------------------------------------------------------- phone
+
+   The landing page had no width rules of its own. Its grids collapse on
+   their own, which is why nothing overflowed, but the hero's action row
+   wrapped into ragged left-aligned lines of four different widths. */
+@media (max-width: 560px) {
+  .hero__actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .hero__actions > * {
+    width: 100%;
+  }
+
+  /* Full width, the pill's copy button was left stranded beside the command
+     with the rest of the row empty. It goes to the edge it belongs to. */
+  .install-pill {
+    justify-content: flex-start;
+  }
+
+  .install-pill button {
+    margin-left: auto;
+  }
+
+  /* A pill is a shape for one line. This one carries the version and a
+     sentence, and on a narrow screen it wrapped to two, which left the
+     version centred against a block instead of sitting on its first line. */
+  .hero__eyebrow {
+    align-items: flex-start;
+    border-radius: var(--radius);
+  }
+}

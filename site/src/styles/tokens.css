@@ -113,6 +113,16 @@
   --shadow-lg: 0 24px 60px -20px rgba(0, 0, 0, 0.72);
 }
 
+/* A finger is not a mouse pointer. Where the pointer is coarse every control
+   in the chrome grows to a size a thumb can hit without aiming; the header is
+   56px tall, so 40px still leaves it breathing room. The desktop keeps the
+   tighter 32px, which is right for a cursor and wrong for a hand. */
+@media (pointer: coarse) {
+  :root {
+    --control-h: 2.5rem;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

@@ -1,3 +1,4 @@
+import type { RefObject } from 'react'
 import { Link, NavLink } from 'react-router-dom'
 
 import { useLocale } from '@/lib/locale'
@@ -11,15 +12,18 @@ import { ThemeToggle } from './ThemeToggle'
 export function Header({
   menuOpen,
   onToggleMenu,
+  menuButtonRef,
 }: {
   menuOpen: boolean
   onToggleMenu: () => void
+  menuButtonRef?: RefObject<HTMLButtonElement | null>
 }) {
   const { href, t } = useLocale()
 
   return (
     <header className="header">
       <button
+        ref={menuButtonRef}
         type="button"
         className="icon-button menu-button"
         onClick={onToggleMenu}

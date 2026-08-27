@@ -131,6 +131,16 @@
   align-items: start;
 }
 
+/* Rendered on the landing page only to be the phone's drawer. Above the
+   breakpoint that page has no sidebar column, so it has no sidebar. */
+.sidebar--drawer {
+  display: none;
+}
+
+.sidebar__scrim {
+  display: none;
+}
+
 .sidebar {
   position: sticky;
   top: var(--header-h);
@@ -398,7 +408,12 @@
     transform: translateX(0);
   }
 
+  .sidebar--drawer {
+    display: block;
+  }
+
   .sidebar__scrim {
+    display: block;
     position: fixed;
     inset: var(--header-h) 0 0 0;
     z-index: 44;
@@ -411,12 +426,71 @@
     padding-top: 1.5rem;
   }
 
+  /* index.html asks for viewport-fit=cover, which puts the page under the
+     notch and the rounded corners. Having asked for the whole screen, the
+     page owes the reader the insets back: in landscape the header's first
+     control sat under the camera cutout, and the drawer's last link sat
+     under the home indicator. */
+  .header {
+    padding-left: max(var(--gutter), env(safe-area-inset-left));
+    padding-right: max(var(--gutter), env(safe-area-inset-right));
+  }
+
+  .sidebar {
+    padding-bottom: calc(3rem + env(safe-area-inset-bottom));
+    padding-left: max(1rem, env(safe-area-inset-left));
+  }
+
+  .footer__inner {
+    padding-bottom: calc(2.5rem + env(safe-area-inset-bottom));
+  }
+
+  /* The header is translucent over a blur. At 86% the body text scrolling
+     beneath it stayed legible through the bar, which read as two paragraphs
+     overlapping rather than as a surface. */
+  .header {
+    background: color-mix(in srgb, var(--bg) 96%, transparent);
+  }
+
   .pager {
     grid-template-columns: 1fr;
   }
 
   .pager__link--next {
     grid-column: 1;
+  }
+}
+
+/* ------------------------------------------------- touch targets
+
+   Measured on a 390px viewport: the navigation links were 29px tall, the
+   language menu items 34px and the footer links 21px. All three are the
+   primary way to move around the site on a phone, and all three were below
+   the size a thumb hits reliably. Nothing here changes the desktop, where a
+   cursor lands where it is pointed. */
+@media (pointer: coarse) {
+  .sidebar__link {
+    padding: 0.78rem 0.65rem;
+  }
+
+  .langmenu__list a,
+  .langmenu__list button[role='menuitem'],
+  .langmenu__list span[role='menuitem'] {
+    padding: 0.7rem 0.7rem;
+  }
+
+  .footer__links {
+    gap: 0 1.25rem;
+  }
+
+  .footer__links a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 2.5rem;
+  }
+
+  .header__brand {
+    min-height: var(--control-h);
   }
 }
 

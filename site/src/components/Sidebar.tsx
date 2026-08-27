@@ -3,7 +3,15 @@ import { NavLink } from 'react-router-dom'
 import { useLocale } from '@/lib/locale'
 import { nav } from '@/lib/nav'
 
-export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
+export function Sidebar({
+  open,
+  onClose,
+  drawerOnly = false,
+}: {
+  open: boolean
+  onClose: () => void
+  drawerOnly?: boolean
+}) {
   const { locale, href, t } = useLocale()
 
   return (
@@ -17,7 +25,12 @@ export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void 
         />
       ) : null}
 
-      <nav id="sidebar" className="sidebar scroll-thin" data-open={open} aria-label={t.docsNav}>
+      <nav
+        id="sidebar"
+        className={`sidebar scroll-thin${drawerOnly ? ' sidebar--drawer' : ''}`}
+        data-open={open}
+        aria-label={t.docsNav}
+      >
         {nav(locale).map((group) => (
           <div className="sidebar__group" key={group.title}>
             <h2 className="sidebar__title">{group.title}</h2>

@@ -196,3 +196,21 @@
     color: var(--fg);
   }
 }
+
+/* The dialog is reached by thumb on a phone: the field it opens onto was 28px
+   tall and every result row was a line of text with no band around it. */
+@media (pointer: coarse) {
+  .search-dialog__field {
+    padding-top: 0.35rem;
+    padding-bottom: 0.35rem;
+  }
+
+  .search-dialog__field input {
+    min-height: 2.25rem;
+  }
+
+  .search-result {
+    padding-top: 0.65rem;
+    padding-bottom: 0.65rem;
+  }
+}

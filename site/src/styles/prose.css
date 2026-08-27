@@ -261,6 +261,54 @@
   opacity: 1;
 }
 
+/* A phone has no hover, so a control that only appears on hover is a control
+   that does not exist there. Every code block on the site had a copy button
+   no reader on a phone could ever see.
+
+   Showing it is not enough on its own: it floats over the code, and a phone's
+   code column is a few words wide, so the button landed on the first line of
+   every block. It drops its label, and the block opens a band above the first
+   line for it to sit in. */
+@media (hover: none) {
+  .copy-button {
+    opacity: 1;
+    gap: 0;
+    justify-content: center;
+    min-width: var(--control-h);
+    min-height: var(--control-h);
+    padding: 0;
+    /* Collapses the label without removing it: the icon keeps its own size
+       and the accessible name is on the button, not in the text. */
+    font-size: 0;
+  }
+
+  .code-block > pre {
+    padding-top: 2.9rem;
+  }
+
+  /* A block that names its file already has a band. The button moves into it
+     rather than straddling its lower edge, and the bar reserves the width so
+     a long filename does not run underneath. */
+  .code-block:has(.code-block__head) > pre {
+    padding-top: 0.95rem;
+  }
+
+  .code-block__head {
+    min-height: calc(var(--control-h) + 0.3rem);
+    padding-right: calc(var(--control-h) + 0.75rem);
+  }
+
+  .code-block:has(.code-block__head) .copy-button {
+    top: 0.15rem;
+  }
+}
+
+/* The browser puts a heading at y=0 when it restores a hash, and the header
+   is sticky over the first 56px of that. */
+.prose :is(h2, h3, h4)[id] {
+  scroll-margin-top: calc(var(--header-h) + 1rem);
+}
+
 .copy-button:hover {
   color: var(--fg);
   border-color: var(--border-strong);
