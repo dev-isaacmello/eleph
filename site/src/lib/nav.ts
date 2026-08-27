@@ -1,23 +1,34 @@
 /**
- * The shape of the documentation.
+ * The shape of the documentation, per language.
  *
- * Everything the sidebar, the previous/next pager, the breadcrumbs and the
- * router know about the site comes from this one list, so a page cannot exist
- * without being reachable and cannot be reachable without existing.
+ * Hrefs are stored unprefixed and canonical (`/docs/...`). The locale prefix is
+ * applied at render by `withLocale`, so a page's identity does not change when
+ * it is translated and switching language can keep you where you were.
  */
 
-export type Locale = 'en'
+export type Locale = 'en' | 'pt-BR'
 
 export const DEFAULT_LOCALE: Locale = 'en'
 
-export const LOCALES: { code: Locale | string; label: string; href?: string }[] = [
-  { code: 'en', label: 'English' },
-  // Translations live as READMEs in the repository until they are ported here.
-  {
-    code: 'pt-BR',
-    label: 'Português',
-    href: 'https://github.com/dev-isaacmello/eleph/blob/main/docs/README.pt-BR.md',
-  },
+export interface LocaleInfo {
+  code: Locale
+  /** What the menu calls it, in that language. */
+  label: string
+  /** The `lang` attribute for `<html>`. */
+  htmlLang: string
+}
+
+export const LOCALES: LocaleInfo[] = [
+  { code: 'en', label: 'English', htmlLang: 'en' },
+  { code: 'pt-BR', label: 'Português', htmlLang: 'pt-BR' },
+]
+
+/**
+ * Languages the project has as translated READMEs but not as pages here.
+ * They belong in the footer, not in the language menu: a menu entry that
+ * navigates off the site is the thing this menu exists to stop doing.
+ */
+export const README_TRANSLATIONS = [
   {
     code: 'es',
     label: 'Español',
@@ -30,10 +41,29 @@ export const LOCALES: { code: Locale | string; label: string; href?: string }[] 
   },
 ]
 
+export function isLocale(value: string): value is Locale {
+  return LOCALES.some((l) => l.code === value)
+}
+
+/** Prefix a canonical href for a locale. The default locale has no prefix. */
+export function withLocale(locale: Locale, href: string): string {
+  if (locale === DEFAULT_LOCALE) return href
+  return href === '/' ? `/${locale}` : `/${locale}${href}`
+}
+
+/** Split a pathname into the locale it names and the canonical path under it. */
+export function splitLocale(pathname: string): { locale: Locale; path: string } {
+  const [, first, ...rest] = pathname.split('/')
+  if (first && isLocale(first)) {
+    const path = '/' + rest.join('/')
+    return { locale: first, path: path === '/' ? '/' : path.replace(/\/$/, '') }
+  }
+  return { locale: DEFAULT_LOCALE, path: pathname.replace(/(.)\/$/, '$1') }
+}
+
 export interface NavItem {
   title: string
   href: string
-  /** Shown next to the link in the sidebar. Kept short on purpose. */
   badge?: string
 }
 
@@ -42,74 +72,135 @@ export interface NavGroup {
   items: NavItem[]
 }
 
-export const nav: Record<Locale, NavGroup[]> = {
-  en: [
-    {
-      title: 'Use it in your agent',
-      items: [
-        { title: 'Start here', href: '/docs/use/start-here' },
-        { title: 'Any model, any framework', href: '/docs/use/any-model' },
-        { title: 'Modelling your domain', href: '/docs/use/modelling' },
-      ],
+/** The routes, in reading order. Titles are per language; hrefs are not. */
+const STRUCTURE: { group: string; items: string[] }[] = [
+  {
+    group: 'use',
+    items: ['/docs/use/start-here', '/docs/use/any-model', '/docs/use/modelling'],
+  },
+  {
+    group: 'intro',
+    items: ['/docs', '/docs/installation', '/docs/quickstart', '/docs/the-mccarthy-bug'],
+  },
+  {
+    group: 'concepts',
+    items: [
+      '/docs/concepts/past-is-state',
+      '/docs/concepts/obligations',
+      '/docs/concepts/completeness',
+      '/docs/concepts/commitments',
+      '/docs/concepts/permission',
+    ],
+  },
+  {
+    group: 'reference',
+    items: [
+      '/docs/reference/program-structure',
+      '/docs/reference/expressions',
+      '/docs/reference/statements',
+      '/docs/reference/obligations',
+      '/docs/reference/grammar',
+    ],
+  },
+  { group: 'tooling', items: ['/docs/cli', '/docs/python-api'] },
+  {
+    group: 'practice',
+    items: ['/docs/integration/langchain', '/docs/performance', '/docs/taubench'],
+  },
+  { group: 'project', items: ['/docs/limits', '/docs/changelog', '/docs/contributing'] },
+]
+
+/** Group and page titles, per language. Keyed by the canonical href. */
+const TITLES: Record<Locale, { groups: Record<string, string>; pages: Record<string, string> }> = {
+  en: {
+    groups: {
+      use: 'Use it in your agent',
+      intro: 'Introduction',
+      concepts: 'Concepts',
+      reference: 'Language reference',
+      tooling: 'Tooling',
+      practice: 'In practice',
+      project: 'Project',
     },
-    {
-      title: 'Introduction',
-      items: [
-        { title: 'What eleph is', href: '/docs' },
-        { title: 'Installation', href: '/docs/installation' },
-        { title: 'Quickstart', href: '/docs/quickstart' },
-        { title: "McCarthy's bug", href: '/docs/the-mccarthy-bug' },
-      ],
+    pages: {
+      '/docs/use/start-here': 'Start here',
+      '/docs/use/any-model': 'Any model, any framework',
+      '/docs/use/modelling': 'Modelling your domain',
+      '/docs': 'What eleph is',
+      '/docs/installation': 'Installation',
+      '/docs/quickstart': 'Quickstart',
+      '/docs/the-mccarthy-bug': "McCarthy's bug",
+      '/docs/concepts/past-is-state': 'The past is the only state',
+      '/docs/concepts/obligations': 'Obligations, derived',
+      '/docs/concepts/completeness': 'Proof, not spot check',
+      '/docs/concepts/commitments': 'Commitments',
+      '/docs/concepts/permission': 'Permission',
+      '/docs/reference/program-structure': 'Program structure',
+      '/docs/reference/expressions': 'Temporal expressions',
+      '/docs/reference/statements': 'Statements',
+      '/docs/reference/obligations': 'Obligations derived',
+      '/docs/reference/grammar': 'Grammar',
+      '/docs/cli': 'CLI',
+      '/docs/python-api': 'Python API',
+      '/docs/integration/langchain': 'LangChain agent',
+      '/docs/performance': 'Performance',
+      '/docs/taubench': 'τ-bench audit',
+      '/docs/limits': 'Honest limits',
+      '/docs/changelog': 'Changelog',
+      '/docs/contributing': 'Contributing',
     },
-    {
-      title: 'Concepts',
-      items: [
-        { title: 'The past is the only state', href: '/docs/concepts/past-is-state' },
-        { title: 'Obligations, derived', href: '/docs/concepts/obligations' },
-        { title: 'Proof, not spot check', href: '/docs/concepts/completeness' },
-        { title: 'Commitments', href: '/docs/concepts/commitments' },
-        { title: 'Permission', href: '/docs/concepts/permission' },
-      ],
+  },
+  'pt-BR': {
+    groups: {
+      use: 'Use no seu agente',
+      intro: 'Introdução',
+      concepts: 'Conceitos',
+      reference: 'Referência da linguagem',
+      tooling: 'Ferramentas',
+      practice: 'Na prática',
+      project: 'Projeto',
     },
-    {
-      title: 'Language reference',
-      items: [
-        { title: 'Program structure', href: '/docs/reference/program-structure' },
-        { title: 'Temporal expressions', href: '/docs/reference/expressions' },
-        { title: 'Statements', href: '/docs/reference/statements' },
-        { title: 'Obligations derived', href: '/docs/reference/obligations' },
-        { title: 'Grammar', href: '/docs/reference/grammar' },
-      ],
+    pages: {
+      '/docs/use/start-here': 'Comece por aqui',
+      '/docs/use/any-model': 'Qualquer modelo, qualquer framework',
+      '/docs/use/modelling': 'Modelando seu domínio',
+      '/docs': 'O que é o eleph',
+      '/docs/installation': 'Instalação',
+      '/docs/quickstart': 'Primeiros passos',
+      '/docs/the-mccarthy-bug': 'O bug do McCarthy',
+      '/docs/concepts/past-is-state': 'O passado é o único estado',
+      '/docs/concepts/obligations': 'Obrigações, derivadas',
+      '/docs/concepts/completeness': 'Prova, não amostragem',
+      '/docs/concepts/commitments': 'Compromissos',
+      '/docs/concepts/permission': 'Permissão',
+      '/docs/reference/program-structure': 'Estrutura do programa',
+      '/docs/reference/expressions': 'Expressões temporais',
+      '/docs/reference/statements': 'Comandos',
+      '/docs/reference/obligations': 'Obrigações derivadas',
+      '/docs/reference/grammar': 'Gramática',
+      '/docs/cli': 'CLI',
+      '/docs/python-api': 'API Python',
+      '/docs/integration/langchain': 'Agente LangChain',
+      '/docs/performance': 'Desempenho',
+      '/docs/taubench': 'Auditoria τ-bench',
+      '/docs/limits': 'Limites honestos',
+      '/docs/changelog': 'Changelog',
+      '/docs/contributing': 'Contribuir',
     },
-    {
-      title: 'Tooling',
-      items: [
-        { title: 'CLI', href: '/docs/cli' },
-        { title: 'Python API', href: '/docs/python-api' },
-      ],
-    },
-    {
-      title: 'In practice',
-      items: [
-        { title: 'LangChain agent', href: '/docs/integration/langchain' },
-        { title: 'Performance', href: '/docs/performance' },
-        { title: 'τ-bench audit', href: '/docs/taubench' },
-      ],
-    },
-    {
-      title: 'Project',
-      items: [
-        { title: 'Honest limits', href: '/docs/limits' },
-        { title: 'Changelog', href: '/docs/changelog' },
-        { title: 'Contributing', href: '/docs/contributing' },
-      ],
-    },
-  ],
+  },
+}
+
+export function nav(locale: Locale): NavGroup[] {
+  const t = TITLES[locale] ?? TITLES[DEFAULT_LOCALE]
+  return STRUCTURE.map((s) => ({
+    title: t.groups[s.group],
+    items: s.items.map((href) => ({ title: t.pages[href] ?? href, href })),
+  }))
 }
 
 /** Flattened reading order, which is what the pager walks. */
 export function flatten(locale: Locale = DEFAULT_LOCALE): NavItem[] {
-  return nav[locale].flatMap((g) => g.items)
+  return nav(locale).flatMap((g) => g.items)
 }
 
 export function neighbours(href: string, locale: Locale = DEFAULT_LOCALE) {
@@ -122,5 +213,5 @@ export function neighbours(href: string, locale: Locale = DEFAULT_LOCALE) {
 }
 
 export function groupOf(href: string, locale: Locale = DEFAULT_LOCALE) {
-  return nav[locale].find((g) => g.items.some((item) => item.href === href))
+  return nav(locale).find((g) => g.items.some((item) => item.href === href))
 }

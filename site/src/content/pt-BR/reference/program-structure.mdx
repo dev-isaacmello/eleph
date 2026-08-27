@@ -1,0 +1,163 @@
+---
+title: Estrutura do programa
+description: As quatro formas de topo — program, sort, event, fact — e os handlers que respondem perguntas e pedidos.
+---
+
+# Estrutura do programa
+
+<p className="lede">
+Um arquivo declara um programa, os tipos de coisa sobre os quais ele fala, os
+eventos que podem acontecer, os fatos que esses eventos tornam verdadeiros, e os
+handlers que falam. A indentação é significativa, estilo Python, só com espaços.
+</p>
+
+## O formato de um arquivo
+
+```eleph
+program airline
+
+sort Passenger
+sort Flight
+
+event make_reservation(p: Passenger, f: Flight)
+
+fact has_reservation(P: Passenger, F: Flight) :=
+    make_reservation(P, F) since_not cancel_reservation(P, F)
+
+on question(C, has_reservation(P, F)):
+    answer C with has_reservation(P, F)
+```
+
+`program` tem que vir primeiro. Depois dele, `sort`, `event`, `fact` e `on` podem
+aparecer em qualquer ordem. Comentários vão de `#` até o fim da linha.
+
+## `program`
+
+```eleph
+program companhia
+```
+
+Um por arquivo, e ele nomeia o programa. Esse nome aparece no cabeçalho do
+verificador.
+
+## `sort`
+
+```eleph
+sort Passenger
+sort Flight
+```
+
+Um sort é um tipo de objeto. Declará-los é opcional — `event
+make_reservation(passenger, flight)` sem anotações parseia — mas sorts fazem duas
+coisas que valem a pena:
+
+* permitem ao compilador pegar um argumento na posição errada;
+* limitam o domínio sobre o qual o verificador quantifica, que é do que `exists P:
+  Sort where` e `count P: Sort where` precisam.
+
+Dois sorts embutidos existem e não precisam de declaração:
+
+| Sort | Usado para |
+|---|---|
+| `Party` | quem está falando ou sendo falado |
+| `Number` | um campo numérico de evento |
+
+<Callout type="note" title="Rótulos de sort são distintos">
+`Party` e `Passenger` começam ambos com `p`. Antes do 0.2.0 isso tornava dois
+sorts indistinguíveis num contraexemplo impresso. Eles não colidem mais.
+</Callout>
+
+## `event`
+
+```eleph
+event make_reservation(p: Passenger, f: Flight)
+event charged_while_active(u: User, c: Charge, amount: Number)
+event close_flight(f: Flight)
+```
+
+Um evento é algo que pode acontecer. Parâmetros são `nome: Sort`, e a anotação é
+opcional. Eventos são a **única** fonte de verdade: nada mais pode tornar um fato
+verdadeiro.
+
+Eventos sem parâmetro são permitidos — escreva `event tick` ou `event tick()`.
+
+## `fact`
+
+```eleph
+fact has_seat(P: Passenger, F: Flight) :=
+    assign_seat(P, F) since_not cancel_reservation(P, F)
+
+fact seats_left(F: Flight) :=
+    count P: Passenger where has_reservation(P, F) < 2
+
+fact flight_open(F: Flight) := not close_flight(F)
+```
+
+Um fato é uma **expressão temporal nomeada**, não um valor armazenado. Seus
+parâmetros são variáveis lógicas, convencionalmente maiúsculas, e o corpo é
+qualquer [expressão temporal](/docs/reference/expressions). Fatos podem
+referenciar outros fatos.
+
+Todo fato declarado é checado por tipo, seja ele chamado ou não. Antes do 0.3.0 a
+resolução era preguiçosa, então um fato que nenhum handler mencionava nunca era
+checado.
+
+<Callout type="limit">
+Fatos não podem ser recursivos, então propriedades transitivas estão fora de
+alcance.
+</Callout>
+
+## `on` — handlers
+
+```eleph
+on question(C, has_reservation(P, F)):
+    answer C with has_reservation(P, F)
+
+on request(C, make_reservation(P, F)):
+    if has_reservation(P, F):
+        decline C
+    else:
+        record make_reservation(P, F)
+        accept C
+        promise C that has_reservation(P, F)
+```
+
+Existem dois performativos:
+
+| Performativo | O corpo tem que | Respondido com |
+|---|---|---|
+| `question` | responder em todo caminho, exatamente uma vez | `answer C yes` / `no` / `with φ` |
+| `request` | aceitar ou recusar em todo caminho, exatamente uma vez | `accept C` / `decline C` |
+
+O primeiro argumento liga o interlocutor. O segundo é o assunto: um evento para
+`request`, um fato para `question`. Variáveis no assunto ficam ligadas em todo o
+corpo.
+
+"Exatamente uma vez em todo caminho" é uma [obrigação
+estrutural](/docs/concepts/obligations) — um ramo que não diz nada, ou que diz
+duas coisas, é um defeito.
+
+### Condicionando à autoridade
+
+```eleph
+on question(Quem, saldo(C)) permitted pode_perguntar(Quem, C):
+    answer Quem with saldo(C)
+```
+
+`permitted` recebe um fato e entra na condição de caminho de toda obrigação
+derivada do handler. Veja [permissão](/docs/concepts/permission).
+
+## Regras léxicas
+
+* **Espaços, nunca tabs.** Um tab na indentação é erro, com nome próprio: `use
+  espacos, nao tabs, para indentar`.
+* **A indentação tem que ser consistente.** Dedents têm que voltar a um nível que
+  foi aberto.
+* Identificadores são `[A-Za-z_][A-Za-z_0-9]*`. A capitalização carrega convenção
+  mas não significado: sorts e variáveis lógicas são maiúsculos, eventos e fatos
+  não.
+* Números são inteiros não negativos.
+* Operadores de comparação são `>=`, `<=`, `==`, `!=`, `<`, `>`. Definição é `:=`.
+
+A lista completa de palavras-chave está em <Source file="eleph/lexer.py" />, e a
+gramática está na [página de gramática](/docs/reference/grammar).

@@ -1,0 +1,141 @@
+---
+title: Comandos
+description: Tudo que um corpo de handler pode fazer — answer, record, accept, decline, promise, offer, release, e if/else.
+---
+
+# Comandos
+
+<p className="lede">
+Um corpo de handler é uma sequência de comandos. Cada um deles é um ato de fala,
+um registro de algo que aconteceu, ou um desvio.
+</p>
+
+## A lista completa
+
+| Comando | O que faz |
+|---|---|
+| `answer C yes` | afirma que o assunto vale |
+| `answer C no` | afirma que o assunto não vale |
+| `answer C with φ` | responde do jeito que o log disser |
+| `record e(...)` | algo aconteceu; anexa ao log |
+| `accept C` | aceita um pedido |
+| `decline C` | recusa um pedido |
+| `offer C that φ` | disposto, ainda sem dever |
+| `promise C that φ` | φ é verdadeiro agora |
+| `promise C eventually φ` | φ vai valer em algum momento |
+| `promise C that φ before e(...)` | φ vai valer antes de `e` ocorrer |
+| `release C from φ` | dispensa o programa de uma dívida |
+| `if φ: … else: …` | desvia sobre o passado |
+
+## `answer`
+
+```eleph
+on question(C, has_reservation(P, F)):
+    if has_reservation(P, F):
+        answer C yes
+    else:
+        answer C no
+```
+
+Ou, equivalentemente e sem margem de erro:
+
+```eleph
+on question(C, has_reservation(P, F)):
+    answer C with has_reservation(P, F)
+```
+
+`answer C with φ` é a forma que não tem como errar: responde do jeito que o log
+disser. As formas literais são o que torna o [bug do
+McCarthy](/docs/the-mccarthy-bug) expressável, e portanto pegável.
+
+Todo caminho por um handler de `question` tem que responder **exatamente uma
+vez**. Tanto uma resposta faltando quanto uma resposta dupla são defeitos
+estruturais.
+
+## `record`
+
+```eleph
+record make_reservation(P, F)
+```
+
+A única forma de qualquer coisa se tornar verdadeira. A ordem importa dentro de um
+handler: uma promessa imediata é descarregada sobre o log *mais* o que foi
+registrado antes dela nesse mesmo corpo.
+
+## `accept` e `decline`
+
+```eleph
+on request(C, make_reservation(P, F)):
+    if has_reservation(P, F):
+        decline C
+    else:
+        record make_reservation(P, F)
+        accept C
+```
+
+Todo caminho por um handler de `request` tem que aceitar ou recusar **exatamente
+uma vez**.
+
+Os dois aceitam um assunto explícito opcional — `accept C make_reservation(P, F)`
+— para quando o handler é sobre uma coisa e a resposta é sobre outra.
+
+## Os quatro compromissos
+
+```eleph
+offer    C that φ
+promise  C that φ
+promise  C eventually φ
+promise  C that φ before e(...)
+```
+
+Cada um carrega uma obrigação diferente. O tratamento completo, com o livro, está
+na [página de compromissos](/docs/concepts/commitments).
+
+```eleph
+on request(C, make_reservation(P, F)):
+    if has_reservation(P, F):
+        decline C
+    else:
+        if seats_left(F) and flight_open(F):
+            record make_reservation(P, F)
+            accept C
+            promise C that has_reservation(P, F)
+            promise C that has_seat(P, F) before board(P, F)
+        else:
+            decline C
+```
+
+## `release`
+
+```eleph
+release C from has_seat(P, F)
+```
+
+Dispensa o programa de uma dívida que ele não consegue mais cumprir — depois de um
+cancelamento, por exemplo. É um ato de fala e vai para o log: uma dívida
+silenciosamente abandonada e uma dívida formalmente liberada são históricos
+diferentes.
+
+## `if` / `else`
+
+```eleph
+if seats_left(F) and flight_open(F):
+    ...
+else:
+    ...
+```
+
+A condição é qualquer [expressão temporal](/docs/reference/expressions). O ramo
+tomado vira a **condição de caminho** de toda obrigação derivada de comandos
+dentro dele — é essa a linha `supondo` que o verificador imprime.
+
+`else` é opcional, mas deixá-lo de fora de um handler de `question` ou `request`
+normalmente cria um caminho que não diz nada, o que é defeito estrutural. O
+verificador vai avisar.
+
+## O que não está aqui
+
+Não há atribuição, nem laço, nem chamada de função, nem variável. Isso não é um
+subconjunto escolhido por simplicidade; é o [projeto](/docs/concepts/past-is-state).
+O passado é o estado, então não há a que atribuir, e um handler roda uma vez por
+fala, então não há sobre o que iterar.

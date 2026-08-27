@@ -1,0 +1,163 @@
+---
+title: O bug do McCarthy
+description: A diferença de uma palavra entre "ele fez uma reserva" e "ele tem uma", e por que a linguagem inteira existe para expô-la.
+---
+
+# O bug do McCarthy
+
+<p className="lede">
+O exemplo é do próprio McCarthy, e tem nove linhas. Um programa de suporte é
+perguntado se um passageiro tem uma reserva. Ele responde checando se o
+passageiro fez uma. São perguntas diferentes, e a diferença é o cancelamento.
+</p>
+
+## A armadilha está na gramática, de propósito
+
+No eleph, um átomo de evento sozinho significa *isto aconteceu ao menos uma vez,
+alguma vez*:
+
+```eleph
+make_reservation(P, F)      # alguma vez aconteceu
+```
+
+Lê-se como "tem uma reserva". Significa "fez uma reserva". Os dois concordam até
+alguém cancelar, e depois disso nunca mais concordam.
+
+Isso não é acidente de sintaxe que uma palavra-chave melhor resolveria. É o
+formato do erro que sistemas reais cometem: uma coluna booleana chamada
+`has_reservation` que alguém esqueceu de limpar, um cache, um resumo que
+desatualizou. A linguagem mantém a armadilha aberta de propósito e põe um
+verificador do lado.
+
+## O que o verificador faz com ela
+
+Dado o handler com bug, o `eleph check` reporta:
+
+```out
+  X   question(Caller, has_reservation)  linha 17  -  resposta yes e verdadeira
+
+      historico que quebra a obrigacao:
+        1. make_reservation(P, F)
+        2. cancel_reservation(P, F)
+        3. disse-ask-sobre-has_reservation(Caller, P, F)
+
+      o programa responde yes, a verdade do log e no
+```
+
+Três coisas nessa saída merecem separação.
+
+**É um histórico, não um stack trace.** O contraexemplo é uma sequência de
+eventos que qualquer produção poderia produzir. Dá para ler em voz alta para um
+colega.
+
+**O terceiro evento é a própria pergunta.** Os atos de fala do programa vão para
+o mesmo log que os eventos do mundo. É isso que torna `spoke` consultável depois,
+e é por isso que o elefante nunca esquece.
+
+**A última linha nomeia os dois lados.** `o programa responde yes, a verdade do
+log e no` — o que o programa disse, e o que o histórico implica. A obrigação é a
+distância entre os dois.
+
+## Por que um teste não teria achado
+
+Um teste para esse bug exige que alguém tenha pensado em cancelamento. Essa é a
+dificuldade inteira: o bug é invisível justamente para quem o escreveu, porque a
+pessoa lê `make_reservation(P, F)` e ouve "tem uma reserva".
+
+A obrigação também não foi coisa que alguém pensou. Ela foi derivada:
+
+```out
+  linha 17  question(Caller, has_reservation)
+    resposta yes e verdadeira
+      supondo   alguma vez make_reservation(P, F)
+      entao     (make_reservation(P, F) e desde entao nenhum cancel_reservation(P, F))
+```
+
+`supondo` é a condição de caminho — o ramo que o programa tomou. `entao` é o que
+responder `yes` *àquela pergunta* afirma. A obrigação é que o primeiro implique o
+segundo, e o Z3 é perguntado se algum histórico torna o primeiro verdadeiro e o
+segundo falso.
+
+## A correção, e o que ela custa
+
+```eleph
+on question(Caller, has_reservation(P, F)):
+    if make_reservation(P, F) since_not cancel_reservation(P, F):
+        answer Caller yes
+    else:
+        answer Caller no
+```
+
+Agora o guarda é a própria definição do fato, então não sobrou nada para
+discordar. Melhor ainda, diga uma vez só:
+
+```eleph
+on question(Caller, has_reservation(P, F)):
+    answer Caller with has_reservation(P, F)
+```
+
+`answer C with φ` responde do jeito que o log disser, que é a forma que não tem
+como errar. O verificador aceita as duas.
+
+<Callout type="proved">
+```out
+$ eleph check examples/airline.eleph
+
+  ok  question(Caller, has_reservation)  linha 16  -  resposta yes e verdadeira
+  ok  question(Caller, has_reservation)  linha 18  -  resposta no e verdadeira
+
+PROVADO  -  2 obrigacoes valem para TODO historico, de qualquer tamanho
+```
+</Callout>
+
+## Um bug que se esconde mais fundo
+
+Um evento de distância é fácil. O `examples/fundo.eleph` é o mesmo formato de erro
+a uma distância de sete:
+
+<Snippet file="examples/fundo.eleph">
+```eleph
+program milhagem
+sort Passenger
+sort Flight
+event make_reservation(p: Passenger, f: Flight)
+fact elite(P: Passenger, F: Flight) := count make_reservation(P, F) >= 8
+
+on question(C, elite(P, F)):
+    if count make_reservation(P, F) >= 7:
+        answer C yes
+    else:
+        answer C no
+```
+</Snippet>
+
+Sete não é oito. Uma busca limitada que para em seis históricos **aprova o
+programa**:
+
+```out
+$ eleph check examples/fundo.eleph --bound 6
+
+  ok? question(C, elite)  linha 11  -  resposta yes e verdadeira
+  ok? question(C, elite)  linha 13  -  resposta no e verdadeira
+
+SEM CONTRAEXEMPLO  -  dentro dos limites checados, que nao sao exaustivos aqui
+```
+
+O `ok?` e o veredito dizem, os dois, que a execução não foi exaustiva. Deixado
+calcular o próprio limiar, o verificador acha:
+
+```out
+$ eleph check examples/fundo.eleph
+
+  X   question(C, elite)  linha 11  -  resposta yes e verdadeira
+      historico que quebra a obrigacao:
+        1..7. make_reservation(P, F)
+        8. disse-ask-sobre-elite(C, P, F)
+
+REPROVADO  -  1 obrigacao nao cumprida
+```
+
+É por isso que o verificador calcula um [limiar de
+completude](/docs/concepts/completeness) por obrigação em vez de aceitar um
+limite fixo. Um limite fixo de seis era o comportamento no 0.1.0, e era
+incorreto.

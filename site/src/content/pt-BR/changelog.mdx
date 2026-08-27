@@ -1,0 +1,102 @@
+---
+title: Changelog
+description: Todas as versões do eleph, seguindo Keep a Changelog e versionamento semântico.
+---
+
+# Changelog
+
+<p className="lede">
+O formato segue o <a href="https://keepachangelog.com/en/1.1.0/">Keep a
+Changelog</a> e o projeto usa <a href="https://semver.org/">versionamento
+semântico</a>. A cópia canônica é o <a
+href="https://github.com/dev-isaacmello/eleph/blob/main/CHANGELOG.md">CHANGELOG.md</a>.
+</p>
+
+## 0.3.0
+
+### Adicionado
+
+* **Campos numéricos**, comparados no instante em que o evento acontece:
+  `charged(U, amount > 100)`. A comparação é parte da identidade do átomo em vez de
+  um fato separado que poderia se mover por baixo, então o argumento de completude
+  sobrevive e programas numéricos continuam decididos exaustivamente.
+* **Permissão**, o oitavo ato de fala de McCarthy:
+  `on question(Q, saldo(U)) permitted autorizado(Q, U):`. Não se uma resposta é
+  verdadeira, mas se esta parte tinha direito de perguntar. A permissão entra na
+  condição de caminho, então respostas são provadas sob ela, e o runtime falha
+  fechando.
+* **Ofertas**: `offer C that φ`, o compromisso mais fraco. Não é dívida, porque
+  ninguém aceitou; o que ela deve é que algum caminho poderia honrá-la.
+* **Uma checagem estrutural de portas destrancadas.** Um handler exigindo permissão
+  e o vizinho sem exigir nada é uma porta da frente trancada ao lado de uma janela
+  aberta, e agora é reportado como defeito.
+* **Um exemplo funcional com LangChain** (`examples/langchain-agent`): o mesmo
+  agente executado com e sem guarda, sobre nove cenários, contra o Claude por chave
+  de API ou pelo Agent SDK sobre OAuth.
+
+### Corrigido
+
+* Todo fato declarado é checado por tipo, seja ele chamado ou não. A resolução era
+  preguiçosa, então um fato que nenhum handler mencionava nunca era checado.
+
+## 0.2.0
+
+Primeira versão pública.
+
+### Adicionado
+
+* **API Python embutível** (`eleph.Policy`, `eleph.Guard`). Três formas de
+  integração: observador, guarda, e a própria linguagem. As regras que uma guarda
+  aplica em execução são o mesmo arquivo que o verificador prova.
+* **Limiares de completude** (`eleph/threshold.py`). O `check` virou procedimento
+  de decisão em vez de busca limitada. O limiar linear cobre o fragmento de átomos;
+  fora dele, a completude vem do espaço de estados do monitor, e além disso o
+  verificador admite que a execução não foi exaustiva.
+* **Avaliação do passado em tempo constante** (`eleph/incremental.py`). Recorrências
+  de um passo mais um lema de localidade. Medido em 140.546 eventos em 5,7 s com
+  throughput constante, onde reler o log era quadrático. `Machine(audit=True)` confere
+  o índice contra o log a cada consulta.
+* **Log durável append-only** (`eleph/store.py`). Compromissos são registrados como
+  eventos, então o livro é derivado em vez de fotografado. Uma última linha truncada
+  é descartada e o log continua usável.
+* **Sorts e quantificação.** Parâmetros tipados, `exists P: Sort where`, e
+  `count P: Sort where`, que é do que um limite de capacidade precisa.
+* **Promessas sobre o futuro.** `promise C eventually φ` e
+  `promise C that φ before e(...)`, com checagem estática de cumpribilidade e um
+  livro em runtime que reporta o que está em aberto e o que foi quebrado.
+* **Atos de fala como predicados consultáveis** (`spoke accept to C about e(...)`).
+* **Fronteira de linguagem natural** (`eleph/frontend.py`). O schema JSON que o
+  modelo preenche é gerado dos próprios handlers do programa.
+* **Segurança entre threads.** Escritores concorrentes são serializados.
+* **Auditorias do τ-bench** (`bench/taubench/`). A regra de confirmação e a de
+  elegibilidade de cancelamento, reexecutadas sobre 200 trajetórias publicadas.
+* **NP-completude** do fragmento de átomos, com uma redução SAT que é executada
+  contra força bruta em vez de apenas afirmada.
+* Comandos: `obligations`, `check`, `run`, `talk`, `ledger`.
+* Documentação em inglês, português, espanhol e mandarim.
+
+### Alterado
+
+* Renomeado de `elephant2000` para `eleph`.
+* Limiares são calculados por obrigação em vez de um limite fixo de seis. Aquele
+  limite era **incorreto**: `examples/fundo.eleph` só mente depois de sete eventos e
+  um limite de seis o aprovava.
+* O limiar soma a maior demanda por átomo distinto em vez de por nó de sintaxe. Os
+  limiares caíram cerca de três vezes e a suíte ficou mais rápida.
+
+### Corrigido
+
+* O Z3 mantém uma tabela global de símbolos, então cada codificação agora usa o
+  próprio namespace. Sem isso, um nome declarado num sort colidia com o seguinte.
+* O livro não reescaneia mais todo compromisso a cada evento, o que mantinha o
+  runtime quadrático mesmo com o índice no lugar.
+* Rótulos de sort não colidem mais (`Party` e `Passenger` começavam ambos com `p`),
+  o que tornava dois sorts indistinguíveis num contraexemplo.
+* A cumpribilidade de uma promessa futura agora exige um caminho que a torne de
+  falsa em verdadeira. A checagem anterior aceitava qualquer fórmula satisfazível e
+  era portanto vazia.
+
+## 0.1.0
+
+Interno. Verificador e runtime para o axioma da resposta e promessas imediatas,
+limitado a seis eventos fixos.

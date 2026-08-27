@@ -1,0 +1,109 @@
+---
+title: Desempenho
+description: Tempo constante por evento sobre um histórico que nunca para de crescer, e a auditoria que mantém a otimização honesta.
+---
+
+# Desempenho
+
+<p className="lede">
+A objeção óbvia a uma linguagem cujo único estado é o passado é que responder uma
+pergunta significa ler o passado. Isso é quadrático, e apareceu: com quatro mil
+interações, uma versão inicial rodava a 46 eventos por segundo.
+</p>
+
+## As recorrências
+
+Todo operador temporal aqui tem uma recorrência de um passo:
+
+```text
+once(x)@t          =  x@t  or  once(x)@(t-1)
+(a since_not b)@t  =  a@t  or  ((a since_not b)@(t-1) and not b@t)
+count(a)@t         =  count(a)@(t-1) + [a@t]
+```
+
+Essa é a leitura por programação dinâmica da lógica temporal de passado (Havelund
+e Roșu, 2001). Sozinha, ela dá tempo linear por evento, o que ainda é demais
+quando o número de chaves rastreadas cresce com o histórico.
+
+## O lema de localidade
+
+> **Se um evento não casa com nenhum átomo de uma subfórmula, o valor da
+> subfórmula não muda.**
+
+*Prova.* Leia as recorrências com `x@t = a@t = false`: `once` mantém o valor,
+`since_not` mantém o valor (`b@t` é falso, então o conjunto sobrevive), e a
+contagem incrementa zero. ∎
+
+Então dobrar um evento para dentro toca só as chaves que esse evento **nomeia**, e
+há no máximo tantas quanto o evento tem argumentos. Atualizar é O(1) no tamanho do
+log.
+
+## Medido
+
+```out
+$ python bench/scaling.py
+
+interacoes      log   relendo   indice   ganho     ev/s  escala
+       500     1134      1.62    0.058     28x    19482       -
+      1000     2274      6.15    0.109     56x    20867   x1.87
+                       (x3.8)
+      2000     4554     24.97    0.208    120x    21890   x1.91
+                       (x4.1)
+      4000     9100         -    0.381      -    23912   x1.83
+      8000    18192         -    0.830      -    21909   x2.18
+```
+
+O tempo dobra quando o trabalho dobra, onde reler o log quadruplicava. A coluna
+`relendo` para em dois mil porque acima disso não vale a espera.
+
+Medido em **145.564 eventos em 6,1 s** com throughput constante — cerca de 24 mil
+eventos por segundo, e a taxa não decai conforme o log cresce.
+
+## A otimização nunca é confiada
+
+Cada célula do índice é uma função pura do log — a mesma função que o avaliador
+ingênuo calcula relendo. Isso torna a coisa uma otimização de uma **alegação de
+verdade**, que não é o tipo de coisa para se aceitar na fé:
+
+```python
+g = policy.guard(audit=True)
+```
+
+`Machine(audit=True)` responde toda consulta **pelos dois caminhos** e levanta erro
+se alguma vez discordarem. É exercitado sobre passados aleatórios e históricos
+acima de mil eventos em <Source file="tests/test_incremental.py" />, que é a única
+razão para acreditar em <Source file="eleph/incremental.py" />.
+
+<Callout type="proved" title="A terceira alegação, e o experimento que a quebraria">
+**O índice calcula o que o log calcula.** Se os dois avaliadores alguma vez
+discordarem em qualquer histórico, a alegação é falsa e o teste diz isso.
+</Callout>
+
+## Quando o índice não se aplica
+
+<Callout type="limit" title="O índice precisa de localidade">
+Uma subfórmula que nomeia **menos variáveis que a subfórmula pai** faz um evento
+perturbar ilimitadas chaves. Esses programas ainda rodam, relendo o log, e
+`Machine.index.usable` diz isso.
+</Callout>
+
+## Reiniciando
+
+Nada além de eventos é escrito em disco. O índice e o livro são reconstruídos
+revivendo o passado, então um processo que morreu e voltou é indistinguível de um
+que nunca morreu.
+
+Esse também é o custo permanente: **abrir um log de dez milhões de eventos
+reexecuta todos os dez milhões.** O regime estacionário é constante por evento; a
+partida não é. Snapshot — um que possa ser *conferido* contra o log em vez de
+confiado — é [onde há demanda](/docs/contributing).
+
+## Rodando você mesmo
+
+```bash
+python bench/scaling.py
+```
+
+O benchmark imprime os dois caminhos lado a lado, então a alegação é medida em vez
+de afirmada. Há mais sobre o que `bench/` contém em
+<Source file="bench/README.md" />.

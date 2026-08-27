@@ -437,6 +437,7 @@
 }
 
 .langmenu__list a,
+.langmenu__list button[role='menuitem'],
 .langmenu__list span[role='menuitem'] {
   display: flex;
   align-items: center;
@@ -449,7 +450,16 @@
   white-space: nowrap;
 }
 
-.langmenu__list a:hover {
+.langmenu__list button[role='menuitem'] {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
+  text-align: left;
+}
+
+.langmenu__list a:hover,
+.langmenu__list button[role='menuitem']:hover {
   background: var(--bg-inset);
   color: var(--fg);
 }

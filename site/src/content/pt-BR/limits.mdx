@@ -1,0 +1,104 @@
+---
+title: Limites honestos
+description: O que o eleph genuinamente não consegue fazer hoje. Verificado, não maquiado.
+---
+
+# Limites honestos
+
+<p className="lede">
+Isto não é hedge de marketing. Cada entrada aqui é verificada, e cada uma está
+presente porque algo genuinamente não está coberto. Acrescentar a esta lista é uma
+contribuição.
+</p>
+
+## Não existe relógio de parede
+
+`since_not` sabe **ordem**, não tempo. *"Cancelar em até 24 horas da reserva"* não
+é expressável diretamente.
+
+O padrão que funciona hoje, e o que <Source file="bench/taubench/cancel.eleph" />
+usa, é o sistema hospedeiro emitir o prazo como evento. O relógio vive fora da
+lógica, que é como sistemas orientados a eventos lidam com tempo de qualquer forma.
+
+## Campos numéricos são comparados no instante em que o evento acontece
+
+```eleph
+charged(U, amount > 100)     # esta cobranca, no momento em que caiu
+```
+
+É isso que mantém o [argumento de completude](/docs/concepts/completeness)
+intacto, e também é o limite: você pode perguntar se *esta cobrança* passou de
+100, não se a soma das últimas três passou. **Aritmética agregada sobre o histórico
+não é expressável.**
+
+## O limiar linear de completude cobre um fragmento
+
+Ele vale quando todo `since_not` recebe **átomos**. Fora disso, a completude vem do
+espaço de estados do monitor, e além disso o verificador admite que a execução não
+foi exaustiva.
+
+O limiar também **cresce com as constantes**: provar algo sobre uma capacidade de
+180 precisa de históricos que caibam 180 eventos.
+
+## Uma promessa futura é checada por cumpribilidade, não por liveness
+
+O compilador prova que *algum caminho* a estabelece. Ele não pode provar que o
+interlocutor vai percorrer esse caminho, porque nenhum programa pode. Veja
+[compromissos](/docs/concepts/commitments).
+
+## O índice precisa de localidade
+
+Uma subfórmula que nomeia **menos variáveis que a pai** faz um evento perturbar
+ilimitadas chaves. Esses programas ainda rodam, relendo o log, e
+`Machine.index.usable` diz isso — mas a alegação de tempo constante não se aplica a
+eles.
+
+## `spoke` nomeia a troca, não o conteúdo
+
+*"Já prometi exatamente isto?"* não é expressável. *"Já prometi alguma coisa
+aqui?"* é.
+
+## Permissão é um fato, não um sistema de papéis
+
+`permitted` condiciona um handler a algo que o log sustenta, o que cobre *"este
+interlocutor está autenticado nesta conta"*. Não há **papéis, hierarquia nem
+delegação**.
+
+## Fatos não podem ser recursivos
+
+Propriedades transitivas estão fora de alcance.
+
+## A auditoria do τ-bench lê linguagem natural com regex
+
+Assentimento é casado a partir de uma lista generosa de palavras, então as contagens
+**subestimam em vez de superestimar**. Violações de amostra foram lidas à mão antes
+de os números serem publicados. Veja [a auditoria](/docs/taubench).
+
+## Os teoremas são provados no papel e testados, não mecanizados
+
+Um artefato em Lean 4 para o fragmento ground é a próxima coisa que vale construir,
+e é [onde há demanda](/docs/contributing). Estimado em cinco a nove dias úteis; até
+onde sabemos, seria o primeiro limiar de completude mecanizado para uma linguagem
+de especificação temporal.
+
+## Abrir um log longo reexecuta ele
+
+O regime estacionário é constante por evento, mas abrir um log de dez milhões de
+eventos reexecuta todos os dez milhões. Um snapshot que possa ser **conferido**
+contra o log em vez de confiado manteria a propriedade derivada. Também [onde há
+demanda](/docs/contributing).
+
+---
+
+## Um limite que não está na lista, porque não é um limite
+
+<Callout type="danger" title="Uma prova diz que cada obrigação vale. Ela não diz que a política é a que você queria.">
+Escrever a regra não te entrega a regra certa. Te entrega uma regra que você pode
+interrogar.
+
+Essa distinção foi o que trouxe à tona o buraco de composição no [exemplo com
+LangChain](/docs/integration/langchain): duas ações permitidas se compondo num
+resultado proibido, numa política que estava `PROVADO` antes e depois da correção.
+Sem algo para interrogar, o buraco teria ido para produção com a palavra `PROVADO`
+ao lado, que é a pior combinação disponível.
+</Callout>

@@ -1,0 +1,132 @@
+---
+title: Obrigações, derivadas
+description: Dez condições de correção lidas do texto do programa, descarregadas pelo Z3 ou estruturalmente pelo compilador. Ninguém as escreve.
+---
+
+# Obrigações, derivadas
+
+<p className="lede">
+Uma obrigação é uma condição de correção que o próprio texto do programa exige.
+Você não a escreve, não a anota, não a configura. O compilador a lê do handler, e
+então o verificador tenta quebrá-la.
+</p>
+
+## O formato de uma
+
+Toda obrigação derivada tem as mesmas três partes:
+
+| Parte | O que é |
+|---|---|
+| **suposições** (`supondo`) | a condição de caminho — o ramo que o programa tomou até este comando |
+| **objetivo** (`entao`) | o que executar aquele ato de fala afirma sobre o log |
+| **polaridade** | se o objetivo tem que valer em todo histórico assim, ou em ao menos um |
+
+Impresso:
+
+```out
+  linha 17  question(Caller, has_reservation)
+    resposta yes e verdadeira
+      supondo   alguma vez make_reservation(P, F)
+      entao     (make_reservation(P, F) e desde entao nenhum cancel_reservation(P, F))
+```
+
+Lê-se: *no caminho em que `make_reservation(P, F)` alguma vez aconteceu,
+responder `yes` afirma que existe uma reserva de pé agora.* O Z3 é perguntado se
+algum histórico torna a suposição verdadeira e o objetivo falso.
+
+Use `eleph obligations <arquivo>` para vê-las sem descarregar. Esse comando existe
+para deixar um ponto claro: **ninguém escreveu isso.**
+
+## As dez
+
+| Obrigação | Checada por |
+|---|---|
+| a resposta é verdadeira | Z3, no limiar de completude |
+| a resposta responde à pergunta feita | Z3 |
+| promessa imediata vale quando feita | Z3, sobre o log mais o que o handler acabou de registrar |
+| promessa futura é uma que algum caminho consegue realizar | Z3, exigindo que o caminho a torne de falsa em verdadeira |
+| tipos dos argumentos batem com as declarações | compilador, em todo fato, usado ou não |
+| uma oferta é uma que algum caminho poderia honrar | Z3 |
+| nenhuma porta para um assunto protegido fica destrancada | estrutural |
+| todo caminho responde exatamente uma vez | estrutural |
+| todo pedido é aceito ou recusado exatamente uma vez | estrutural |
+| compromissos em aberto e quebrados | livro em runtime |
+
+A última é a única que não é estática. Uma promessa sobre o futuro não pode ser
+descarregada antes de o futuro chegar, então o runtime mantém um livro e reporta o
+que está em aberto e o que foi quebrado.
+
+## Três delas, em detalhe
+
+### A resposta é verdadeira
+
+O primeiro axioma de McCarthy. Todo `answer C yes`, `answer C no` e `answer C
+with φ` tem que ser implicado pelo log no momento em que é dito. É essa que o
+[bug do McCarthy](/docs/the-mccarthy-bug) viola.
+
+### Promessa imediata vale quando feita
+
+`promise C that φ` afirma que φ é verdadeiro *agora*, e a checagem roda sobre o
+log mais o que o handler registrou no caminho até aqui:
+
+```eleph
+on request(Caller, make_reservation(P, F)):
+    if has_reservation(P, F):
+        decline Caller
+    else:
+        record make_reservation(P, F)
+        accept Caller
+        promise Caller that has_reservation(P, F)
+```
+
+A promessa só é provável porque o `record` veio antes no mesmo handler. Mova o
+`record` para depois do `promise` e a obrigação falha.
+
+### Promessa futura é cumprível
+
+`promise C eventually φ` e `promise C that φ before e(...)` não podem ser
+verdadeiras quando ditas — é isso que as torna promessas futuras. O que o
+compilador prova é que *algum caminho pelo programa estabelece φ*, e ele exige que
+esse caminho a torne de falsa em verdadeira:
+
+```out
+  ok  request(C, make_reservation)  linha 46  -  a promessa pode vir a ser cumprida (antes de board(P, F))
+      cumprivel por: request assign_seat > entao l51
+```
+
+O trace nomeia o caminho. Uma versão anterior dessa checagem aceitava qualquer
+fórmula satisfazível, o que a tornava vazia; foi corrigido no 0.2.0.
+
+<Callout type="limit" title="Cumpribilidade não é liveness">
+O compilador prova que um caminho existe. Ele não pode provar que o interlocutor
+vai percorrê-lo, porque nenhum programa pode. O que acontece se não percorrer é
+assunto do livro.
+</Callout>
+
+## Defeitos estruturais
+
+Três das dez nunca chegam ao solver. São propriedades do formato do programa:
+
+* **Todo caminho responde exatamente uma vez.** Um handler de `question` com um
+  ramo que não diz nada, ou que responde duas vezes, é um defeito.
+* **Todo pedido é aceito ou recusado exatamente uma vez.** Mesmo argumento para
+  `request`.
+* **Nenhuma porta destrancada.** Um handler sobre um assunto exigindo `permitted`
+  e o vizinho sobre o mesmo assunto sem exigir nada é uma porta da frente
+  trancada ao lado de uma janela aberta. Adicionado no 0.3.0; veja
+  [permissão](/docs/concepts/permission).
+
+Defeitos estruturais são reportados antes de o solver rodar e contam como falhas:
+
+```out
+  X   question(Quem, saldo)  linha 22
+      outro handler sobre este assunto exige permissao e este nao
+```
+
+## De onde elas vêm
+
+A derivação vive em <Source file="eleph/obligations.py" />, e a descarga em
+<Source file="eleph/verify.py" />. A alegação de solidez que liga as duas — *se
+toda obrigação é provada, o runtime nunca recusa* — é testada martelando programas
+provados com passados aleatórios e conversas aleatórias em
+<Source file="tests/test_soundness.py" />.

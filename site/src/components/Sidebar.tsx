@@ -1,32 +1,35 @@
 import { NavLink } from 'react-router-dom'
 
-import { nav, DEFAULT_LOCALE } from '@/lib/nav'
+import { useLocale } from '@/lib/locale'
+import { nav } from '@/lib/nav'
 
 export function Sidebar({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const { locale, href, t } = useLocale()
+
   return (
     <>
       {open ? (
         <button
           type="button"
           className="sidebar__scrim"
-          aria-label="Close navigation"
+          aria-label={t.closeNav}
           onClick={onClose}
         />
       ) : null}
 
-      <nav
-        id="sidebar"
-        className="sidebar scroll-thin"
-        data-open={open}
-        aria-label="Documentation"
-      >
-        {nav[DEFAULT_LOCALE].map((group) => (
+      <nav id="sidebar" className="sidebar scroll-thin" data-open={open} aria-label={t.docsNav}>
+        {nav(locale).map((group) => (
           <div className="sidebar__group" key={group.title}>
             <h2 className="sidebar__title">{group.title}</h2>
             <ul className="sidebar__list">
               {group.items.map((item) => (
                 <li key={item.href}>
-                  <NavLink to={item.href} end className="sidebar__link" onClick={onClose}>
+                  <NavLink
+                    to={href(item.href)}
+                    end
+                    className="sidebar__link"
+                    onClick={onClose}
+                  >
                     <span>{item.title}</span>
                     {item.badge ? <span className="sidebar__badge">{item.badge}</span> : null}
                   </NavLink>

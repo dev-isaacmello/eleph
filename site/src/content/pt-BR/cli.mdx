@@ -1,0 +1,241 @@
+---
+title: CLI
+description: Os cinco comandos — obligations, check, run, talk, ledger — com cada flag e cada código de saída.
+---
+
+# CLI
+
+<p className="lede">
+Cinco comandos. Dois deles leem o programa, dois executam, e um lê de volta o que
+ele ainda deve.
+</p>
+
+```out
+$ eleph --help
+usage: elephant [-h] {check,obligations,run,talk,ledger} ...
+
+positional arguments:
+  {check,obligations,run,talk,ledger}
+    check               verificar um programa
+    obligations         mostrar as condicoes derivadas, sem verificar
+    run                 executar um dialogo contra o programa
+    talk                conversar em linguagem natural
+    ledger              o que o programa ainda deve
+```
+
+Todo comando aceita `--no-color`, que é o que você quer em CI e num pipe.
+
+<Callout type="note" title="Os caminhos desta página são do repositório">
+`examples/` não é instalado por `pip install` nem `uv add`, então as execuções
+citadas aqui assumem um clone. E se o `eleph` estiver no `.venv` de um projeto em
+vez de no seu PATH, prefixe tudo com `uv run`. Veja
+[instalação](/docs/installation).
+</Callout>
+
+## `eleph obligations`
+
+```bash
+eleph obligations <arquivo>
+```
+
+Imprime as condições de correção que o próprio texto do programa exige, sem tentar
+descarregá-las. O ponto do exercício: **ninguém escreveu isso.**
+
+```out
+$ eleph obligations examples/airline_buggy.eleph
+
+examples/airline_buggy.eleph: condicoes que o proprio texto do programa exige
+
+  linha 17  question(Caller, has_reservation)
+    resposta yes e verdadeira
+      supondo   alguma vez make_reservation(P, F)
+      entao     (make_reservation(P, F) e desde entao nenhum cancel_reservation(P, F))
+
+  linha 19  question(Caller, has_reservation)
+    resposta no e verdadeira
+      supondo   nao alguma vez make_reservation(P, F)
+      entao     nao (make_reservation(P, F) e desde entao nenhum cancel_reservation(P, F))
+```
+
+Defeitos estruturais são listados depois das obrigações, prefixados pela linha.
+
+## `eleph check`
+
+```bash
+eleph check <arquivo> [--bound N] [--objects N]
+```
+
+Deriva as obrigações e tenta quebrar cada uma no seu próprio [limiar de
+completude](/docs/concepts/completeness).
+
+```out
+$ eleph check examples/companhia.eleph
+
+examples/companhia.eleph  ->  programa companhia
+5 eventos, 4 fatos, 6 handlers
+
+6 obrigacoes derivadas do texto do programa
+cada uma checada no seu limiar de completude (o maior: 10 eventos) -- exaustivo
+
+  ok  question(C, has_reservation)  linha 30  -  a resposta responde a pergunta feita
+  ok  question(C, has_seat)  linha 33  -  a resposta responde a pergunta feita
+  ok  question(C, seats_left)  linha 36  -  a resposta responde a pergunta feita
+  ok  request(C, make_reservation)  linha 45  -  a promessa esta cumprida ao ser feita
+  ok  request(C, make_reservation)  linha 46  -  a promessa pode vir a ser cumprida (antes de board(P, F))
+      cumprivel por: request assign_seat > entao l51
+  ok  request(C, cancel_reservation)  linha 61  -  a promessa esta cumprida ao ser feita
+
+PROVADO  -  6 obrigacoes valem para TODO historico, de qualquer tamanho
+```
+
+### Flags
+
+| Flag | Padrão | Efeito |
+|---|---|---|
+| `--bound N` | o limiar de completude | força o tamanho do histórico. Abaixo do limiar o resultado deixa de ser prova, e a ferramenta diz isso |
+| `--objects N` | o domínio calculado | força o número de objetos por sort |
+| `--no-color` | desligado | saída sem cor |
+
+<Callout type="danger" title="Um limite abaixo do limiar não é prova">
+```out
+$ eleph check examples/fundo.eleph --bound 6
+
+  linha 11: limite pedido abaixo do limiar
+
+  ok? question(C, elite)  linha 11  -  resposta yes e verdadeira
+
+SEM CONTRAEXEMPLO  -  dentro dos limites checados, que nao sao exaustivos aqui
+```
+`ok?` e `SEM CONTRAEXEMPLO` significam, os dois, que a execução não foi exaustiva.
+Este exemplo só mente depois de sete eventos.
+</Callout>
+
+### Códigos de saída
+
+| Código | Significado |
+|---|---|
+| `0` | nenhuma falha — ou `PROVADO` ou `SEM CONTRAEXEMPLO` |
+| `1` | `REPROVADO`: ao menos uma obrigação tem contraexemplo ou defeito estrutural |
+| `2` | o arquivo não passou no lexer, no parser ou na resolução |
+
+Repare que `0` cobre tanto provado quanto não exaustivo. Se seu CI precisa de
+prova e não de ausência de contraexemplo, faça grep por `PROVADO`.
+
+## `eleph run`
+
+```bash
+eleph run <arquivo> <roteiro> [--log CAMINHO]
+```
+
+Executa uma sessão roteirizada contra o programa. As linhas do roteiro são:
+
+<Snippet file="examples/voo.session">
+```text
+# Capacidade 2. Tres passageiros querem entrar.
+request alice make_reservation(alice, ba117)
+request bruno make_reservation(bruno, ba117)
+request carla make_reservation(carla, ba117)
+
+# Alice recebe assento; a promessa dela e paga.
+request alice assign_seat(alice, ba117)
+
+# Bruno embarca sem assento. O prazo vence.
+given board(bruno, ba117)
+
+question alice has_seat(alice, ba117)
+question carla has_reservation(carla, ba117)
+```
+</Snippet>
+
+| Diretiva | Significado |
+|---|---|
+| `request <parte> <evento>(...)` | alguém pede ao programa que faça algo |
+| `question <parte> <fato>(...)` | alguém pergunta ao programa se algo vale |
+| `given <evento>(...)` | o mundo fez algo, fora da conversa |
+
+`--log CAMINHO` torna o histórico durável. Reabrir o mesmo caminho reexecuta, então
+uma execução continua de onde a última parou.
+
+Código de saída `1` se alguma promessa terminou quebrada; uma recusa imprime
+`RECUSA` e também sai com `1`.
+
+## `eleph talk`
+
+```bash
+eleph talk <arquivo> <conversa> [--roster a,b,c] [--claude] [--log CAMINHO]
+```
+
+Linguagem comum entra, atos de fala saem, as mesmas garantias por baixo.
+
+```out
+$ eleph talk examples/companhia.eleph examples/conversa.txt --roster alice,bruno,ba117
+
+  extrator: PatternExtractor (proposicoes, nao decisoes)
+
+  alice: "quero make_reservation para alice no ba117"
+      -> lido como: request make_reservation(alice, ba117)
+  alice: request make_reservation(alice, ba117)
+      [log] make_reservation(alice, ba117)
+      programa: aceito
+      programa: prometo, e ja esta feito
+  alice: "a alice tem has_reservation no ba117?"
+      -> lido como: question has_reservation(alice, ba117)
+      programa: yes
+  alice: e a cotacao do dolar hoje?
+      (nada que este programa saiba tratar)
+```
+
+| Flag | Efeito |
+|---|---|
+| `--roster a,b,c` | nomes conhecidos, para o extrator conseguir resolvê-los |
+| `--claude` | usa o Claude como extrator em vez do casador de padrões. Requer `pip install "eleph[claude]"` e uma credencial |
+| `--log CAMINHO` | histórico durável, como no `run` |
+
+<Callout type="note" title="O extrator propõe; a linguagem decide">
+O front end transforma texto em atos de fala candidatos e nada mais. O schema JSON
+que o modelo preenche é gerado dos próprios handlers do programa, então ele não
+consegue propor um ato que o programa não tem. Se uma proposta quebraria uma
+obrigação, o runtime a recusa — e a execução imprime `o extrator propos; a
+linguagem recusou.`
+</Callout>
+
+## `eleph ledger`
+
+```bash
+eleph ledger <arquivo> <log>
+```
+
+O que o programa ainda deve, lido de volta do histórico dele.
+
+```out
+$ eleph ledger examples/companhia.eleph /tmp/voo.jsonl
+
+/tmp/voo.jsonl
+  22 eventos (4 do mundo, 18 de fala)
+
+  CUMPRIDA  a alice: (assign_seat(alice, ba117) e desde entao nenhum
+            cancel_reservation(alice, ba117)) (antes de board(alice, ba117))
+  QUEBRADA  a bruno: (assign_seat(bruno, ba117) e desde entao nenhum
+            cancel_reservation(bruno, ba117)) (antes de board(bruno, ba117))
+
+  1 promessa quebrada
+```
+
+Código de saída `1` se algo estiver quebrado. Nada desse livro é armazenado: ele é
+recalculado a partir dos eventos.
+
+## Lendo a saída
+
+| Marcador | Cor | Significado |
+|---|---|---|
+| `ok` | verde | descarregada no limiar de completude |
+| `ok?` | amarelo | sobreviveu ao limite dado, que estava abaixo do limiar |
+| `X` | vermelho | contraexemplo, impresso como histórico |
+| `CUMPRIDA` | verde | compromisso cumprido |
+| `ABERTA` | amarelo | compromisso em aberto |
+| `QUEBRADA` | vermelho | compromisso quebrado |
+| `LIBERADA` | apagado | compromisso liberado |
+| `RECUSA` | vermelho | o runtime recusou um ato de fala |
+
+O nome do comando no `--help` é `elephant`, que é o `prog` do parser; o entry point
+instalado é `eleph`.

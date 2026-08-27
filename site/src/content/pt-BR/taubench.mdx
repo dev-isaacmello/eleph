@@ -1,0 +1,127 @@
+---
+title: Auditoria τ-bench
+description: Duas regras da política do próprio τ-bench escritas como fatos eleph e reexecutadas sobre 200 trajetórias publicadas. Ambas se revelaram ambíguas.
+---
+
+# Auditoria τ-bench
+
+<p className="lede">
+O <a href="https://arxiv.org/abs/2406.12045">τ-bench</a> (ICLR 2025) entrega a um
+agente de atendimento de companhia aérea uma política escrita, diz duas vezes que
+<strong>"a API não confere isso pelo agente"</strong>, e pontua execuções por hash
+do banco final. A obrigação é declarada, não aplicada, e não medida.
+</p>
+
+Duas das regras dele estão escritas aqui como fatos `.eleph` e reexecutadas sobre
+as 200 trajetórias publicadas do gpt-4o.
+
+## Os números
+
+```out
+$ python bench/taubench/check.py         # a regra de confirmacao
+  gasta na acao                 85 escritas sem confirmacao,  8 em execucoes pontuadas como sucesso
+  expira no turno               52 escritas sem confirmacao,  4 em execucoes pontuadas como sucesso
+
+$ python bench/taubench/cancel_check.py  # elegibilidade de cancelamento
+  seguro E motivo coberto       38 cancelamentos proibidos, 26 deles no gabarito anotado
+  ter seguro basta              16 cancelamentos proibidos,  7 deles no gabarito anotado
+```
+
+Cada linha é uma *leitura* da regra, não uma variante do verificador. Esse é o
+achado.
+
+## O que saiu disso
+
+Escrever as regras formalmente fez algo mais interessante que contar violações.
+**As duas regras se revelaram ambíguas de um jeito que importa.**
+
+### "um yes"
+
+A regra de confirmação não diz se um único `yes` cobre uma ação ou um lote. As duas
+leituras **não são ordenadas**: 25 execuções só a primeira acusa, 4 só a segunda.
+Não há leitura mais permissiva para onde recuar. A frase tem que ser decidida.
+
+| Leitura | Escritas sem confirmação | …em execuções pontuadas como sucesso |
+|---|---|---|
+| a confirmação é gasta na ação | 85 | 8 |
+| a confirmação expira no fim do turno | 52 | 4 |
+
+### "e a condição é atendida"
+
+A regra de cancelamento permite cancelar *"apenas se seguro-viagem foi comprado **e
+a condição é atendida**"* — e nunca diz qual condição.
+
+Lida estritamente, ela proíbe 38 cancelamentos, **26 dos quais o gabarito anotado
+executa**. Ou seja, a subespecificação alcança o **gabarito**, não só o agente.
+
+Versões posteriores do benchmark reescreveram exatamente essa frase. A formalização
+caiu nela sem ter sido dirigida para lá.
+
+## O que isto não alega
+
+<Callout type="note" title="O τ-bench não está errado">
+A recompensa dele é documentada e deliberada, e o artigo diz textualmente que `r =
+1` *"pode ser uma condição necessária mas não suficiente"*. A alegação aqui é mais
+estreita: **um compromisso que um agente foi mandado cumprir não é medido pela
+coisa que mede o agente, e leva uma linha para medi-lo.**
+</Callout>
+
+## O formato da auditoria
+
+Esta é a forma **observador** — a mais barata das três. Nada do τ-bench foi
+modificado. As trajetórias são de terceiros, elas são reexecutadas como eventos, e
+os fatos são perguntados sobre o que era verdade:
+
+<Snippet file="bench/taubench/cancel.eleph" title="uma regra de um benchmark publicado, escrita como fato">
+```eleph
+fact tem_seguro(R: Reservation) := comprou_seguro(R) since_not cancelou(R)
+```
+</Snippet>
+
+O padrão de prazo vale nota: as regras do τ-bench mencionam uma janela de 24 horas,
+e o eleph [não tem relógio de parede](/docs/limits). O sistema hospedeiro emite o
+prazo como evento, que é como sistemas orientados a eventos lidam com tempo de
+qualquer forma.
+
+## Rodando
+
+```bash
+python bench/taubench/check.py
+python bench/taubench/cancel_check.py
+```
+
+As trajetórias e a tabela de voos — cerca de 6 MB, MIT, Sierra Research — são
+**baixadas no primeiro uso e deliberadamente não versionadas**: apontar para a
+fonte é mais honesto que manter uma cópia que pode desatualizar. Sem rede, os
+testes pulam limpo.
+
+## Todo número foi lido à mão
+
+<Callout type="proved" title="A única regra do projeto">
+**Não publique um número que você não leu à mão.**
+
+Cada valor acima sobreviveu a uma auditoria de casos individuais, e **três deles
+mudaram por causa disso**:
+
+* a primeira contagem de escritas sem confirmação cobrava um lote sob um só `yes`;
+* a segunda chamava um upgrade-e-depois-cancelamento de violação, o que a política
+  permite expressamente;
+* a terceira modelava um atributo mutável com "aconteceu uma vez".
+
+Cada correção deixou o número **menor** e a alegação mais forte.
+</Callout>
+
+`tests/test_taubench.py` fixa cada valor, então uma mudança no verificador que mexa
+num número quebra a suíte.
+
+## O limite dela própria
+
+<Callout type="limit">
+A auditoria lê linguagem natural com **regex**. Assentimento é casado a partir de
+uma lista generosa de palavras, então as contagens **subestimam em vez de
+superestimar**. Violações de amostra foram lidas à mão antes de os números serem
+publicados.
+</Callout>
+
+A auditoria completa, as duas ambiguidades e o que cada número sobreviveu, está em
+<Source file="bench/README.md" />.

@@ -1,5 +1,6 @@
 import { Link, NavLink } from 'react-router-dom'
 
+import { useLocale } from '@/lib/locale'
 import { site } from '@/lib/site'
 import { IconGitHub, IconMenu, IconClose } from './Icons'
 import { LanguageMenu } from './LanguageMenu'
@@ -30,6 +31,8 @@ export function Header({
   menuOpen: boolean
   onToggleMenu: () => void
 }) {
+  const { href, t } = useLocale()
+
   return (
     <header className="header">
       <button
@@ -38,12 +41,12 @@ export function Header({
         onClick={onToggleMenu}
         aria-expanded={menuOpen}
         aria-controls="sidebar"
-        aria-label={menuOpen ? 'Close navigation' : 'Open navigation'}
+        aria-label={menuOpen ? t.closeNav : t.openNav}
       >
         {menuOpen ? <IconClose /> : <IconMenu />}
       </button>
 
-      <Link to="/" className="header__brand">
+      <Link to={href('/')} className="header__brand">
         <Mark />
         <span>{site.name}</span>
       </Link>
@@ -58,11 +61,13 @@ export function Header({
         v{site.version}
       </a>
 
-      <nav className="header__nav" aria-label="Primary">
-        <NavLink to="/docs/use/start-here">Use it</NavLink>
-        <NavLink to="/docs">Docs</NavLink>
-        <NavLink to="/docs/reference/program-structure">Reference</NavLink>
-        <NavLink to="/docs/python-api">Python API</NavLink>
+      <nav className="header__nav" aria-label={t.primaryNav}>
+        <NavLink to={href('/docs/use/start-here')}>{t.headerUse}</NavLink>
+        <NavLink to={href('/docs')} end>
+          {t.headerDocs}
+        </NavLink>
+        <NavLink to={href('/docs/reference/program-structure')}>{t.headerReference}</NavLink>
+        <NavLink to={href('/docs/python-api')}>{t.headerApi}</NavLink>
       </nav>
 
       <span className="header__spacer" />

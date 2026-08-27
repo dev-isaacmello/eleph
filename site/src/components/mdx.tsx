@@ -11,6 +11,7 @@ import {
 } from 'react'
 import { Link } from 'react-router-dom'
 
+import { useLocale } from '@/lib/locale'
 import { source } from '@/lib/site'
 import {
   IconAlert,
@@ -43,6 +44,7 @@ function languageOf(children: ReactNode): string | null {
 
 function CopyButton({ target }: { target: React.RefObject<HTMLDivElement | null> }) {
   const [copied, setCopied] = useState(false)
+  const { t } = useLocale()
 
   const copy = useCallback(async () => {
     const text = target.current?.querySelector('code')?.textContent ?? ''
@@ -61,10 +63,10 @@ function CopyButton({ target }: { target: React.RefObject<HTMLDivElement | null>
       className="copy-button"
       data-copied={copied}
       onClick={copy}
-      aria-label={copied ? 'Copied' : 'Copy code'}
+      aria-label={copied ? t.copied : t.copyCode}
     >
       {copied ? <IconCheck /> : <IconCopy />}
-      {copied ? 'Copied' : 'Copy'}
+      {copied ? t.copied : t.copy}
     </button>
   )
 }
@@ -165,10 +167,10 @@ function heading(Tag: 'h2' | 'h3' | 'h4') {
 /* --------------------------------------------------------------- callout */
 
 const CALLOUTS = {
-  note: { icon: IconInfo, label: 'Note' },
-  proved: { icon: IconShield, label: 'Proved' },
-  limit: { icon: IconAlert, label: 'Limit' },
-  danger: { icon: IconAlert, label: 'Careful' },
+  note: { icon: IconInfo, key: 'calloutNote' },
+  proved: { icon: IconShield, key: 'calloutProved' },
+  limit: { icon: IconAlert, key: 'calloutLimit' },
+  danger: { icon: IconAlert, key: 'calloutDanger' },
 } as const
 
 export function Callout({
@@ -180,12 +182,13 @@ export function Callout({
   title?: string
   children: ReactNode
 }) {
-  const { icon: Icon, label } = CALLOUTS[type]
+  const { icon: Icon, key } = CALLOUTS[type]
+  const { t } = useLocale()
   return (
     <div className={`callout callout--${type}`}>
       <Icon width={17} height={17} />
       <div className="callout__body">
-        <strong className="callout__label">{title ?? label}</strong>
+        <strong className="callout__label">{title ?? t[key]}</strong>
         {children}
       </div>
     </div>
@@ -194,11 +197,18 @@ export function Callout({
 
 /* ----------------------------------------------------------------- links */
 
-/** Internal links route; external ones open away and say so. */
+/**
+ * Internal links route; external ones open away and say so.
+ *
+ * Pages write links canonically (`/docs/...`) and this applies the reader's
+ * locale, so a translated page does not have to remember to prefix every link
+ * and cannot drop you back into English halfway through.
+ */
 function Anchor({ href = '', children, ...rest }: ComponentPropsWithoutRef<'a'>) {
+  const { href: localised } = useLocale()
   if (href.startsWith('/')) {
     return (
-      <Link to={href} {...rest}>
+      <Link to={localised(href)} {...rest}>
         {children}
       </Link>
     )

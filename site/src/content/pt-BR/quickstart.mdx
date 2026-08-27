@@ -1,0 +1,196 @@
+---
+title: Primeiros passos
+description: Derive as condições de correção de um programa de nove linhas, quebre-o, conserte, e rode um diálogo contra ele.
+---
+
+# Primeiros passos
+
+<p className="lede">
+Cinco minutos, quatro comandos, e um programa que mente. No fim você terá visto
+o verificador produzir um histórico que quebra uma obrigação que ninguém
+escreveu.
+</p>
+
+<Callout type="note" title="Estes comandos rodam contra o repositório">
+Todo caminho abaixo é um arquivo do repositório do eleph, e nada em `examples/`
+é instalado por `pip install` ou `uv add`. Clone antes:
+
+```bash
+git clone https://github.com/dev-isaacmello/eleph && cd eleph
+uv venv && uv pip install -e ".[dev]"
+source .venv/bin/activate
+```
+
+Se preferir ficar no seu próprio projeto, os programas desta página estão
+impressos por inteiro: salve um num arquivo seu e tire o prefixo `examples/`.
+Veja [instalação](/docs/installation).
+</Callout>
+
+## 1. O programa
+
+<Snippet file="examples/airline_buggy.eleph">
+```eleph
+program airline
+
+event make_reservation(passenger, flight)
+event cancel_reservation(passenger, flight)
+event board(passenger, flight)
+
+fact has_reservation(P, F) := make_reservation(P, F) since_not cancel_reservation(P, F)
+
+on question(Caller, has_reservation(P, F)):
+    if make_reservation(P, F):
+        answer Caller yes
+    else:
+        answer Caller no
+```
+</Snippet>
+
+Não há asserção aqui, nem contrato, nem teste. Há uma declaração do que pode
+acontecer, uma definição do que `has_reservation` significa, e um handler que
+responde a uma pergunta.
+
+## 2. Pergunte o que o texto exige
+
+```bash
+eleph obligations examples/airline_buggy.eleph
+```
+
+```out
+examples/airline_buggy.eleph: condicoes que o proprio texto do programa exige
+
+  linha 17  question(Caller, has_reservation)
+    resposta yes e verdadeira
+      supondo   alguma vez make_reservation(P, F)
+      entao     (make_reservation(P, F) e desde entao nenhum cancel_reservation(P, F))
+
+  linha 19  question(Caller, has_reservation)
+    resposta no e verdadeira
+      supondo   nao alguma vez make_reservation(P, F)
+      entao     nao (make_reservation(P, F) e desde entao nenhum cancel_reservation(P, F))
+```
+
+Leia a primeira em voz alta: *no caminho em que o programa diz sim, o que torna o
+sim verdadeiro?* A linha `supondo` é a condição de caminho — o ramo que ele tomou
+para chegar ali. A linha `entao` é o que dizer `yes` afirma.
+
+Ninguém escreveu nenhuma das duas. As duas foram lidas do programa.
+
+## 3. Tente quebrá-las
+
+```bash
+eleph check examples/airline_buggy.eleph
+```
+
+```out
+examples/airline_buggy.eleph  ->  programa airline
+3 eventos, 1 fato, 1 handler
+
+2 obrigacoes derivadas do texto do programa
+cada uma checada no seu limiar de completude (o maior: 3 eventos) -- exaustivo
+
+  X   question(Caller, has_reservation)  linha 17  -  resposta yes e verdadeira
+      neste caminho o programa afirma que vale (make_reservation(P, F) e desde
+      entao nenhum cancel_reservation(P, F))
+
+      historico que quebra a obrigacao:
+        1. make_reservation(P, F)
+        2. cancel_reservation(P, F)
+        3. disse-ask-sobre-has_reservation(Caller, P, F)   <- fala, registrada
+                                       porque o elefante nao esquece
+
+      o programa responde yes, a verdade do log e no
+
+  ok  question(Caller, has_reservation)  linha 19  -  resposta no e verdadeira
+
+REPROVADO  -  1 obrigacao nao cumprida
+```
+
+O contraexemplo é um histórico, não uma asserção que falhou: reserve, cancele,
+pergunte. O programa responde `yes`; o log diz `no`.
+
+Repare no terceiro evento. A própria pergunta é registrada, porque a fala do
+programa vai para o mesmo log que todo o resto.
+
+## 4. A correção tem uma palavra
+
+<Snippet file="examples/airline.eleph" title="o mesmo programa, correto">
+```eleph
+on question(Caller, has_reservation(P, F)):
+    if make_reservation(P, F) since_not cancel_reservation(P, F):
+        answer Caller yes
+    else:
+        answer Caller no
+```
+</Snippet>
+
+```out
+$ eleph check examples/airline.eleph
+
+  ok  question(Caller, has_reservation)  linha 16  -  resposta yes e verdadeira
+  ok  question(Caller, has_reservation)  linha 18  -  resposta no e verdadeira
+
+PROVADO  -  2 obrigacoes valem para TODO historico, de qualquer tamanho
+```
+
+<Callout type="proved">
+`PROVADO` é mais forte que "os testes passam". Cada obrigação foi checada no seu
+próprio [limiar de completude](/docs/concepts/completeness), o que faz "nenhum
+contraexemplo encontrado" significar "nenhum contraexemplo existe" — para todo
+histórico, de qualquer tamanho.
+</Callout>
+
+## 5. Rode um diálogo de verdade
+
+Um programa maior, com limite de capacidade, assentos e compromissos:
+
+```bash
+eleph run examples/companhia.eleph examples/voo.session --log /tmp/voo.jsonl
+```
+
+```out
+  alice: request make_reservation(alice, ba117)
+      [log] make_reservation(alice, ba117)
+      programa: aceito
+      programa: prometo, e ja esta feito
+      programa: prometo -- a alice: (assign_seat(alice, ba117) e desde entao
+                nenhum cancel_reservation(alice, ba117)) (antes de board(alice, ba117))
+  carla: request make_reservation(carla, ba117)
+      programa: recuso
+  [log] board(bruno, ba117)   (historico pre-existente)
+      [livro] QUEBRADA -- a bruno: (assign_seat(bruno, ba117) e desde entao
+                nenhum cancel_reservation(bruno, ba117)) (antes de board(bruno, ba117))
+
+  livro de compromissos
+    CUMPRIDA  a alice: ...
+    QUEBRADA  a bruno: ...
+
+  log: 22 eventos (4 do mundo, 18 de fala)
+
+  1 promessa quebrada
+```
+
+Carla é recusada porque o voo comporta dois. Bruno embarcou sem assento, então o
+prazo da promessa dele venceu e o livro diz isso. Nada nesse livro está
+armazenado: ele é recalculado a partir dos eventos.
+
+```bash
+eleph ledger examples/companhia.eleph /tmp/voo.jsonl
+```
+
+## Para onde ir
+
+<Steps>
+<li>
+**[O bug do McCarthy](/docs/the-mccarthy-bug)** — a história completa de por que
+`make_reservation` e `has_reservation` são perguntas diferentes.
+</li>
+<li>
+**[O passado é o único estado](/docs/concepts/past-is-state)** — o que substitui
+variáveis, e por que isso é o ponto e não uma restrição.
+</li>
+<li>
+**[API Python](/docs/python-api)** — colocar as mesmas regras embaixo de um
+sistema existente sem escrever nenhum handler `.eleph`.
+</li>
+</Steps>

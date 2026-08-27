@@ -1,0 +1,104 @@
+---
+title: Permissão
+description: O oitavo ato de fala de McCarthy. Não se a resposta é verdadeira, mas se esta parte tinha direito de perguntar.
+---
+
+# Permissão
+
+<p className="lede">
+Um agente de suporte que informa com toda honestidade o saldo de qualquer cliente
+a quem perguntar não mentiu. Todas as outras obrigações desta linguagem passariam
+nele. Ainda assim é um incidente.
+</p>
+
+## O oitavo ato de fala
+
+McCarthy listou autoridade entre os atos de fala que um programa executa, e é o
+que uma revisão comum nunca pergunta. No eleph um handler pode ser condicionado a
+ela:
+
+```eleph
+on question(Quem, saldo(C)) permitted pode_perguntar(Quem, C):
+    answer Quem with saldo(C)
+```
+
+`permitted` recebe um fato, então autoridade é algo que o **log** sustenta, não
+algo que um arquivo de configuração afirma:
+
+```eleph
+fact autorizado(Q: Party, U: User) := autenticou(Q, U) since_not deslogou(Q, U)
+```
+
+Alguém está autorizado numa conta se autenticou nela e não deslogou desde então.
+Isso é uma fórmula sobre o que aconteceu, conferível do mesmo jeito que todo o
+resto aqui.
+
+## Ela entra na condição de caminho
+
+A decisão de projeto importante é que permissão **não** é uma checagem separada
+rodada ao lado. Ela vira parte das suposições de toda obrigação derivada daquele
+handler, então respostas são provadas *sob* ela:
+
+```out
+  ok  question(Quem, active)  linha 55  -  a resposta responde a pergunta feita
+  ok  question(Quem, may_refund)  linha 58  -  a resposta responde a pergunta feita
+  ok  question(Quem, needs_escalation)  linha 61  -  a resposta responde a pergunta feita
+
+PROVADO  -  3 obrigacoes valem para TODO historico, de qualquer tamanho
+```
+
+Um handler cuja resposta só é correta para um interlocutor autorizado é provável;
+o mesmo handler sem o portão não é o mesmo programa.
+
+## Ela falha fechando
+
+Em execução, um handler cuja permissão não vale levanta `NotPermitted` em vez de
+responder. A assimetria é deliberada:
+
+> Uma resposta retida é recuperável. Uma resposta vazada não é.
+
+```python
+from eleph import NotPermitted
+
+try:
+    g.assert_answer("saldo", value, "quem", "conta")
+except NotPermitted:
+    ...   # escalar, pedir autenticacao, recusar — qualquer coisa menos responder
+```
+
+## A porta destrancada
+
+Um portão num handler e nenhum no vizinho é uma porta da frente trancada ao lado
+de uma janela aberta. Desde o 0.3.0 isso é reportado como defeito estrutural antes
+mesmo de o solver rodar:
+
+```out
+  X   question(Quem, saldo)  linha 22
+      outro handler sobre este assunto exige permissao e este nao
+```
+
+A checagem é estrutural porque é sobre o formato do programa, não sobre um
+histórico específico. Veja [obrigações](/docs/concepts/obligations).
+
+## Por que isso não é um sistema de papéis
+
+<Callout type="limit">
+`permitted` condiciona um handler a um fato que o log sustenta, o que cobre *"este
+interlocutor está autenticado nesta conta"*. Não há **papéis, hierarquia nem
+delegação**. Se o seu modelo de autorização precisa disso, modele fora e emita a
+conclusão como evento.
+</Callout>
+
+## Medido
+
+Na [comparação com LangChain](/docs/integration/langchain), o cenário `conta de
+outra pessoa` — alguém autenticado na própria conta perguntando sobre a de um
+estranho — falhou **0 de 5 vezes** sem a guarda. O agente consultou e informou,
+todas as vezes.
+
+Não é um lapso. Nada no prompt dizia para não fazer isso, o pedido do cliente era
+perfeitamente claro, e responder era a coisa prestativa a fazer. Um agente que não
+afirma nada que o registro não sustenta e cumpre toda promessa que faz vai fazer
+isso o dia inteiro.
+
+Essa é a lacuna que o `permitted` existe para fechar.

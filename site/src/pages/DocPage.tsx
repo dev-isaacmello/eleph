@@ -1,61 +1,61 @@
 import { useEffect, useState } from 'react'
-import { Link, useLocation } from 'react-router-dom'
+import { Link } from 'react-router-dom'
 
 import { Pager } from '@/components/Pager'
 import { Toc } from '@/components/Toc'
 import { mdxComponents } from '@/components/mdx'
-import { loaders, type PageModule } from '@/lib/content'
+import { resolvePage, type PageModule } from '@/lib/content'
+import { useLocale } from '@/lib/locale'
 import { groupOf } from '@/lib/nav'
 import { site } from '@/lib/site'
 
 function setMeta(title: string, description?: string) {
-  document.title = title === site.name ? `${site.name} — ${site.tagline}` : `${title} · ${site.name}`
+  document.title =
+    title === site.name ? `${site.name} — ${site.tagline}` : `${title} · ${site.name}`
   if (description) {
-    const tag = document.querySelector('meta[name="description"]')
-    if (tag) tag.setAttribute('content', description)
+    document.querySelector('meta[name="description"]')?.setAttribute('content', description)
   }
 }
 
 export function DocPage() {
-  const { pathname } = useLocation()
-  const route = pathname.replace(/\/$/, '') || '/docs'
+  const { locale, path, href, t } = useLocale()
+  const route = path === '' ? '/docs' : path
   const [page, setPage] = useState<PageModule | null>(null)
-  /** The route whose module is rendered right now, which lags `route`. */
   const [loaded, setLoaded] = useState('')
   const [missing, setMissing] = useState(false)
 
   useEffect(() => {
     let live = true
-    const load = loaders.get(route)
-    if (!load) {
+    const found = resolvePage(locale, route)
+    if (!found) {
       setMissing(true)
       setLoaded('')
-      setMeta('Page not found')
+      setMeta(t.notFoundTitle)
       return
     }
     setMissing(false)
-    load().then((mod) => {
+    found.load().then((mod) => {
       if (!live) return
       setPage(() => mod)
-      setLoaded(route)
+      setLoaded(`${locale}${route}`)
       setMeta(mod.meta?.title ?? site.name, mod.meta?.description)
     })
     return () => {
       live = false
     }
-  }, [route])
+  }, [route, locale, t.notFoundTitle])
 
   if (missing) {
     return (
       <>
         <main id="main" className="main">
           <article className="article prose">
-            <h1>Page not found</h1>
+            <h1>{t.notFoundTitle}</h1>
             <p className="lede">
-              Nothing is documented at <code>{route}</code>.
+              {t.notFoundBody} <code>{route}</code>.
             </p>
             <p>
-              <Link to="/docs">Back to the documentation index</Link>.
+              <Link to={href('/docs')}>{t.notFoundBack}</Link>.
             </p>
           </article>
         </main>
@@ -65,7 +65,7 @@ export function DocPage() {
   }
 
   const Content = page?.default
-  const group = groupOf(route)
+  const group = groupOf(route, locale)
 
   return (
     <>
@@ -73,7 +73,7 @@ export function DocPage() {
         <article id="article" className="article prose">
           {group ? (
             <nav className="breadcrumbs" aria-label="Breadcrumb">
-              <Link to="/docs">Docs</Link>
+              <Link to={href('/docs')}>{t.breadcrumbRoot}</Link>
               <span aria-hidden="true">/</span>
               <span>{group.title}</span>
             </nav>

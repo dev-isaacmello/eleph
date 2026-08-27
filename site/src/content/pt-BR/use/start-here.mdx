@@ -1,0 +1,148 @@
+---
+title: Comece por aqui
+description: Você tem um agente em produção. Ele chama ferramentas e diz coisas aos clientes. É disso que o eleph trata, e do que ele não trata.
+---
+
+# Comece por aqui
+
+<p className="lede">
+Você tem um agente em produção. Ele chama ferramentas, afirma coisas sobre o
+registro de um cliente, e promete fazer coisas. Parte do que ele diz não é
+verdade, e parte do que ele promete nunca acontece. Esta página é sobre isso, e
+você não precisa adotar uma linguagem nova para resolver a maior parte.
+</p>
+
+## O que o eleph faz
+
+Três coisas, e são estreitas de propósito:
+
+<Steps>
+<li>
+**Recusa uma afirmação que o registro não sustenta.** Não suaviza, não loga.
+`assert_answer` levanta erro antes de o texto chegar ao cliente.
+</li>
+<li>
+**Recusa uma chamada de ferramenta cuja precondição não vale.** `require` é
+conferido contra o que de fato aconteceu, não contra um campo que alguém pode
+ter esquecido de atualizar.
+</li>
+<li>
+**Lembra o que você prometeu.** "Seu reembolso está a caminho" vira uma dívida
+com prazo, e no fim da execução existe uma resposta para *entregamos?*
+</li>
+</Steps>
+
+## O que o eleph não faz
+
+<Callout type="danger" title="Ele não vai reduzir sua conta de token">
+Nada neste projeto mede custo, então nada aqui alega mudá-lo. Uma guarda não
+reescreve seu prompt, não adiciona uma chamada de modelo, e não tenta nada de
+novo.
+
+O que dá para verificar é a outra direção: um `Guard` **não faz nenhuma chamada
+de modelo e nenhuma chamada de rede**. É Python lendo uma lista append-only.
+Então ele também não aumenta o gasto.
+
+Se o seu problema é a conta, esta é a ferramenta errada. Se o seu problema é que
+você não consegue dizer quais das respostas do agente eram verdadeiras, continue
+lendo.
+</Callout>
+
+Ele também não é uma técnica de prompt, nem um filtro de saída, nem um motor de
+políticas que se configura por painel. Filtros de saída leem o texto. Isto lê o
+histórico.
+
+## O que a medição de fato mostrou
+
+O mesmo agente, executado duas vezes sobre nove casos de suporte. Modelo
+idêntico, prompt de sistema idêntico, nomes, descrições e assinaturas de
+ferramenta idênticos. A única diferença é se uma guarda fica embaixo das duas
+ferramentas que escrevem.
+
+| | sem eleph | com eleph |
+|---|---|---|
+| Claude Haiku 4.5, 5 execuções por caso | **30/45** | **45/45** |
+| Claude Opus 5, suíte anterior de 7 casos, 3 execuções | **19/21** | **21/21** |
+
+O modelo mais forte falha menos. A direção é a mesma.
+
+Três coisas nesse resultado importam mais que o total, e são elas que dizem se o
+seu sistema tem esse problema:
+
+**As falhas são concentradas, não espalhadas.** Seis dos nove casos passam 5/5
+dos dois lados. Três falham 5/5 sem a guarda. Isso não é um modelo com azar
+ocasional. É um modelo consistente e razoavelmente errado sobre três coisas
+específicas.
+
+**Um caso falha 0/5: alguém perguntou sobre a conta de um estranho.** O agente
+consultou e informou, todas as vezes. Nada no prompt dizia para não fazer isso,
+o pedido era perfeitamente claro, e responder era a coisa prestativa a fazer.
+
+**Um caso passa 5/5 sem a guarda**, e isso importa tanto quanto. O prompt dizia
+que o limite de reembolso é R$ 200 e que casos maiores escalam; o caso era
+claríssimo; o modelo acertou todas as vezes. **Uma instrução clara sobre um caso
+inequívoco funciona. A guarda não é para esses.**
+
+O que separa as três falhas dos seis acertos não é dificuldade. Nas três, o
+modelo teria que desconfiar de alguma coisa: da versão do cliente sobre o
+passado, da insistência do cliente, ou do direito do cliente de estar
+perguntando. Modelos são construídos para não fazer isso.
+
+[A comparação completa, incluindo o bug com que ela foi construída →](/docs/integration/langchain)
+
+## Três formas, da mais barata para a mais cara
+
+Você não precisa adotar a linguagem. Duas destas três não precisam de nada dela.
+
+| Forma | Você muda | Você ganha | Custo de testar |
+|---|---|---|---|
+| **observador** | nada. Você alimenta eventos | o que é verdade do registro, e uma auditoria | uma tarde |
+| **guarda** | asserções e chamadas de ferramenta passam por ela | afirmações sem base levantam erro em vez de irem ao ar | um dia |
+| **linguagem** | handlers escritos em `.eleph` | a prova estática | uma semana |
+
+Comece como observador sobre tráfego que você já tem. Ele não pode quebrar nada,
+porque não aplica nada. Se ele nunca discordar do seu sistema, você não tem esse
+problema e pode parar por aí.
+
+## Qual delas você quer
+
+<Callout type="note" title="Se não tem certeza, você quer a guarda">
+O **observador** responde "meu agente diz coisas que o registro não sustenta?".
+Rode sobre o tráfego de ontem antes de mudar qualquer código.
+
+A **guarda** é a que a maioria dos sistemas coloca em produção. As regras vivem
+num arquivo `.eleph` que o `eleph check` prova; seu Python chama `require`,
+`assert_answer`, `record` e `promise`. Você nunca escreve um handler.
+
+A **linguagem** é para quando a própria lógica de decisão deve ser verificada, e
+não só os fatos que ela lê. Esse é o artefato de pesquisa, e é o único que
+precisa da [referência da linguagem](/docs/reference/program-structure).
+</Callout>
+
+A razão para manter as regras num arquivo de política em vez de escrever as
+verificações em Python é uma linha: **as regras que sua guarda aplica às três da
+manhã são o mesmo artefato que um solver provou.** Uma guarda cujas regras foram
+provadas é coisa diferente de uma guarda cujas regras alguém acreditou.
+
+## O caminho daqui
+
+<Steps>
+<li>
+[**Instalar**](/docs/installation) no seu projeto. Uma dependência, o Z3.
+</li>
+<li>
+[**Ligar ao seu modelo**](/docs/use/any-model) — GPT-4, Claude, qualquer coisa.
+Nada na guarda sabe o que é um LLM.
+</li>
+<li>
+[**Modelar seu domínio**](/docs/use/modelling) — transformar as tabelas que você
+já tem em eventos e fatos, que é o único pensamento genuinamente novo aqui.
+</li>
+<li>
+[**A referência da API**](/docs/python-api), para quando você já sabe o que está
+procurando.
+</li>
+</Steps>
+
+Se você prefere ver a ideia antes da integração, os [primeiros
+passos](/docs/quickstart) são nove linhas e um bug que McCarthy escreveu em 1998.

@@ -1,0 +1,319 @@
+---
+title: Qualquer modelo, qualquer framework
+description: Nada na guarda sabe o que é um LLM. Exemplos com o SDK da OpenAI, um loop de ferramentas cru, e LangChain.
+---
+
+# Qualquer modelo, qualquer framework
+
+<p className="lede">
+O exemplo deste repositório usa LangChain e Claude, e isso é acidente do que
+estava à mão. Um <code>Guard</code> é Python lendo uma lista append-only: não faz
+chamada de modelo, não faz chamada de rede, e não tem opinião sobre qual
+provedor produziu o texto que ele está conferindo.
+</p>
+
+<Callout type="note" title="O que a guarda importa">
+`eleph.guard` puxa `json`, `pathlib`, `dataclasses`, `typing` e o resto do
+`eleph`. Não há cliente HTTP em lugar nenhum do caminho. GPT-4, Claude, Gemini,
+Llama, um fine-tune seu, ou uma máquina de estados escrita à mão: a integração é
+idêntica.
+</Callout>
+
+## Onde a guarda entra
+
+Dois lugares, e só dois.
+
+```text
+                  model proposes                    guard decides
+  ┌──────────┐   ─────────────────▶   ┌─────────┐  ────────────────▶  ┌────────┐
+  │  your    │                        │  your   │   require(...)      │  your  │
+  │  LLM     │                        │  code   │   assert_answer()   │ backend│
+  └──────────┘   ◀─────────────────   └─────────┘  ◀────────────────  └────────┘
+                  tool result                       record(...)
+```
+
+**Antes de uma ferramenta rodar**, dê `require` na precondição. **Antes de uma
+afirmação ir ao ar**, passe por `assert_answer`. Todo o resto é o seu encanamento
+de sempre.
+
+## A política
+
+Um arquivo, provado antes de um agente encostar nele.
+
+<Snippet title="support.eleph">
+```eleph
+program support
+
+sort User
+sort Charge
+
+event authenticated(who: Party, u: User)
+event logged_out(who: Party, u: User)
+
+event subscribed(u: User)
+event cancelled(u: User)
+event refunded(u: User, c: Charge)
+event statement_closed(u: User)
+
+event charged_while_active(u: User, c: Charge, amount: Number)
+event charged_after_cancelling(u: User, c: Charge, amount: Number)
+
+fact authorised(Q: Party, U: User) := authenticated(Q, U) since_not logged_out(Q, U)
+fact active(U: User) := subscribed(U) since_not cancelled(U)
+fact refundable(U: User, C: Charge) := charged_after_cancelling(U, C, amount > 0) since_not refunded(U, C)
+fact within_limit(U: User, C: Charge) := charged_after_cancelling(U, C, amount <= 200) since_not refunded(U, C)
+fact may_refund(U: User, C: Charge) := refundable(U, C) and within_limit(U, C)
+
+on question(Who, active(U)) permitted authorised(Who, U):
+    answer Who with active(U)
+
+on question(Who, may_refund(U, C)) permitted authorised(Who, U):
+    answer Who with may_refund(U, C)
+```
+</Snippet>
+
+```out
+$ eleph check support.eleph
+
+support.eleph  ->  programa support
+8 eventos, 5 fatos, 2 handlers
+
+2 obrigacoes derivadas do texto do programa
+cada uma checada no seu limiar de completude (o maior: 6 eventos) -- exaustivo
+
+  ok  question(Who, active)  linha 30  -  a resposta responde a pergunta feita
+  ok  question(Who, may_refund)  linha 33  -  a resposta responde a pergunta feita
+
+PROVADO  -  2 obrigacoes valem para TODO historico, de qualquer tamanho
+```
+
+## O que ela recusa
+
+Esta é uma execução real, sem nenhum modelo dentro. As quatro propostas são as
+quatro falhas que a comparação com LangChain encontrou, sem o modelo e sem o
+framework.
+
+```python
+from eleph import Policy, Ungrounded
+
+policy = Policy.from_file("support.eleph")
+print("static check:", policy.verify().summary())
+
+g = policy.guard()
+
+# O que seu sistema já sabe. Numa integração real, isto é registrado
+# conforme acontece.
+g.record("subscribed", "ana")
+g.record("charged_while_active", "ana", "c1", "150")
+g.record("authenticated", "session-42", "ana")
+
+# 1. a premissa falsa do cliente: "cancelei mes passado, me reembolsa"
+g.require("refundable", "ana", "c1")
+
+# 2. o modelo afirma algo que o log nega
+g.assert_answer("active", False, "ana")
+
+# 3. a conta de outra pessoa
+g.require("authorised", "session-42", "bruno")
+```
+
+```out
+static check: 2 obrigacoes provadas para todo historico
+
+-- 1. the customer's false premise --
+   REFUSED: o log nao sustenta refundable(ana, c1)
+
+-- 2. the model asserts something the log denies --
+   REFUSED: tentou afirmar active(ana) = False quando o log diz True
+
+-- 3. someone else's account --
+   REFUSED: o log nao sustenta authorised(session-42, bruno)
+```
+
+E a promessa que o caso legítimo cria:
+
+```python
+g.record("cancelled", "ana")
+g.record("charged_after_cancelling", "ana", "c2", "80")
+g.require("may_refund", "ana", "c2")          # passa: cancelou, em aberto, abaixo de 200
+
+# O agente diz "seu reembolso esta a caminho". Isso e uma divida, e vence
+# antes de a fatura fechar.
+g.promise("ana", "refunded", "ana", "c2",
+          before=("statement_closed", ("ana",)))
+
+g.record("statement_closed", "ana")           # e ninguem reembolsou
+```
+
+```out
+-- 4. a legitimate refund, and the promise it creates --
+   outstanding: 1
+
+-- 5. the statement closes and nobody refunded --
+   BREACHED  a ana: alguma vez refunded(ana, c2) (antes de statement_closed(ana))
+   outstanding: 0, breached: 1
+```
+
+Esse último bloco é a categoria que nenhum filtro de saída enxerga: o agente
+disse que ia, e não foi.
+
+## Com o SDK da OpenAI
+
+A guarda são as mesmas quatro chamadas. Só o encanamento em volta muda.
+
+```python
+import json
+from openai import OpenAI
+from eleph import Policy, Ungrounded
+
+client = OpenAI()
+guard = Policy.from_file("support.eleph").guard(log="support.jsonl")
+
+TOOLS = [
+    {
+        "type": "function",
+        "function": {
+            "name": "issue_refund",
+            "description": "Reembolsa uma cobranca especifica de um cliente.",
+            "parameters": {
+                "type": "object",
+                "properties": {
+                    "user": {"type": "string"},
+                    "charge_id": {"type": "string"},
+                },
+                "required": ["user", "charge_id"],
+            },
+        },
+    }
+]
+
+
+def issue_refund(session: str, user: str, charge_id: str) -> str:
+    """A ferramenta que o modelo pode chamar. A guarda decide se ela roda."""
+    try:
+        guard.require("authorised", session, user)     # este interlocutor tem direito
+        guard.require("may_refund", user, charge_id)   # o registro sustenta
+    except Ungrounded as e:
+        return f"RECUSADO pela politica: {e}"
+
+    backend.refund(user, charge_id)                    # seu codigo de sempre
+
+    guard.record("refunded", user, charge_id)
+    guard.promise(user, "refunded", user, charge_id,
+                  before=("statement_closed", (user,)))
+    return "reembolso emitido"
+
+
+def turn(session: str, messages):
+    reply = client.chat.completions.create(
+        model="gpt-4o", messages=messages, tools=TOOLS
+    )
+    message = reply.choices[0].message
+
+    for call in message.tool_calls or []:
+        args = json.loads(call.function.arguments)
+        if call.function.name == "issue_refund":
+            result = issue_refund(session, args["user"], args["charge_id"])
+            messages.append(
+                {"role": "tool", "tool_call_id": call.id, "content": result}
+            )
+    return message
+```
+
+<Callout type="danger" title="A sessão decide quem está falando, nunca a mensagem">
+`session` vem da sua camada de autenticação e é passado para dentro. Ele nunca
+pode ser um parâmetro de ferramenta que o modelo preenche, ou você perguntou ao
+modelo em nome de quem ele está falando, e ele pode responder errado. Este é
+exatamente o caso que falhou 0/5 na comparação.
+</Callout>
+
+Mais dois detalhes que sustentam o resto:
+
+**Uma recusa é um resultado de ferramenta, não uma exceção que mata o turno.**
+Devolver a string para o modelo permite que ele explique a recusa ao cliente, que
+é o que você quer. O que você não pode deixar é que ele repita a mesma chamada e
+tenha sucesso.
+
+**Uma leitura conta como operação.** Divulgação não deixa rastro no seu banco,
+então uma suíte de testes que só pontua escritas vai chamar um vazamento de
+execução limpa. É assim que vazamentos vão para produção.
+
+## Com um loop de ferramentas cru
+
+Sem framework nenhum. As mesmas quatro chamadas.
+
+```python
+def run_tool(session, name, args):
+    spec = GUARDED[name]                     # {"tool": fn, "requires": [...]}
+    try:
+        for fact, *fact_args in spec["requires"]:
+            guard.require(fact, *[args[a] for a in fact_args])
+    except Ungrounded as e:
+        return f"RECUSADO pela politica: {e}"
+
+    out = spec["tool"](**args)
+    for event, *event_args in spec["records"]:
+        guard.record(event, *[args[a] for a in event_args])
+    return out
+```
+
+## Com LangChain
+
+```python
+from langchain_core.tools import tool
+
+@tool
+def issue_refund(user: str, charge_id: str) -> str:
+    """Reembolsa uma cobranca especifica de um cliente."""
+    try:
+        guard.require("may_refund", user, charge_id)
+    except Ungrounded:
+        return "RECUSADO pela politica: o registro nao sustenta este reembolso."
+    out = backend.refund(user, charge_id)
+    guard.record("refunded", user, charge_id)
+    guard.promise(user, "refunded", user, charge_id,
+                  before=("statement_closed", (user,)))
+    return out
+```
+
+A versão completa, executada com e sem a guarda sobre nove cenários, está em
+<Source file="examples/langchain-agent" />.
+
+## Conferindo as palavras do modelo, não só as ações
+
+Chamadas de ferramenta são a metade fácil. A outra metade é o que o agente *diz*:
+
+```python
+def answer_about_account(session, user, model_said_active: bool) -> str:
+    guard.require("authorised", session, user)          # tem direito de perguntar
+    guard.assert_answer("active", model_said_active, user)
+    return "sim" if model_said_active else "nao"
+```
+
+`assert_answer` levanta `Ungrounded` quando o sim ou não do modelo discorda do
+log. É o primeiro axioma de McCarthy, usável diretamente: **diga apenas o que é
+assim.**
+
+## Durabilidade
+
+```python
+guard = policy.guard(log="support.jsonl")
+```
+
+Nada além de eventos é escrito. O índice e o livro de compromissos são
+reconstruídos revivendo o passado, então um processo que morreu e voltou é
+indistinguível de um que nunca morreu, e uma última linha truncada é descartada
+em vez de adivinhada. Veja [o passado é o único
+estado](/docs/concepts/past-is-state).
+
+## Próximo
+
+<Steps>
+<li>
+[**Modelando seu domínio**](/docs/use/modelling) — a parte de pensamento
+genuinamente novo: transformar as tabelas que você tem em eventos e fatos.
+</li>
+<li>
+[**API Python**](/docs/python-api) — cada método, cada exceção.
+</li>
+</Steps>

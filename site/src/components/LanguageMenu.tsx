@@ -1,18 +1,23 @@
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
-import { DEFAULT_LOCALE, LOCALES } from '@/lib/nav'
-import { IconExternal, IconGlobe } from './Icons'
+import { useLocale } from '@/lib/locale'
+import { hasTranslation } from '@/lib/content'
+import { LOCALES, withLocale } from '@/lib/nav'
+import { IconCheck, IconGlobe } from './Icons'
 
 /**
- * The site itself is English. The other three languages exist as translated
- * READMEs in the repository, so this menu says where each one goes rather than
- * pretending they are pages here: a selector that silently navigates off the
- * site is worse than one that tells you it will.
+ * Switches language in place. It keeps you on the page you were reading when
+ * that page exists in the language you picked, and drops to that language's
+ * documentation index when it does not, which is the only honest thing to do
+ * with a page that has not been translated yet.
  */
 export function LanguageMenu() {
   const [open, setOpen] = useState(false)
   const box = useRef<HTMLDivElement>(null)
-  const current = LOCALES.find((l) => l.code === DEFAULT_LOCALE)
+  const navigate = useNavigate()
+  const { locale, path, t } = useLocale()
+  const current = LOCALES.find((l) => l.code === locale)
 
   useEffect(() => {
     if (!open) return
@@ -30,6 +35,18 @@ export function LanguageMenu() {
     }
   }, [open])
 
+  function switchTo(next: (typeof LOCALES)[number]) {
+    setOpen(false)
+    if (next.code === locale) return
+    const target =
+      path === '/' || path === ''
+        ? '/'
+        : hasTranslation(next.code, path)
+          ? path
+          : '/docs'
+    navigate(withLocale(next.code, target))
+  }
+
   return (
     <div className="langmenu" ref={box}>
       <button
@@ -38,8 +55,8 @@ export function LanguageMenu() {
         onClick={() => setOpen((v) => !v)}
         aria-expanded={open}
         aria-haspopup="menu"
-        aria-label={`Language: ${current?.label ?? 'English'}`}
-        title="Language"
+        aria-label={`${t.language}: ${current?.label ?? 'English'}`}
+        title={t.language}
       >
         <IconGlobe />
         <span className="langmenu__current">{current?.label}</span>
@@ -47,31 +64,20 @@ export function LanguageMenu() {
 
       {open ? (
         <ul className="langmenu__list" role="menu">
-          {LOCALES.map((l) =>
-            l.href ? (
-              <li key={l.code} role="none">
-                <a
-                  role="menuitem"
-                  href={l.href}
-                  target="_blank"
-                  rel="noreferrer"
-                  onClick={() => setOpen(false)}
-                >
-                  <span>{l.label}</span>
-                  <span className="langmenu__where">
-                    README <IconExternal />
-                  </span>
-                </a>
-              </li>
-            ) : (
-              <li key={l.code} role="none">
-                <span role="menuitem" aria-current="true" data-current="true">
-                  <span>{l.label}</span>
-                  <span className="langmenu__where">this site</span>
-                </span>
-              </li>
-            ),
-          )}
+          {LOCALES.map((l) => (
+            <li key={l.code} role="none">
+              <button
+                type="button"
+                role="menuitem"
+                lang={l.htmlLang}
+                data-current={l.code === locale}
+                onClick={() => switchTo(l)}
+              >
+                <span>{l.label}</span>
+                {l.code === locale ? <IconCheck /> : null}
+              </button>
+            </li>
+          ))}
         </ul>
       ) : null}
     </div>

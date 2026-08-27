@@ -1,0 +1,257 @@
+---
+title: API Python
+description: Policy, Guard e as três formas de integração — observador, guarda, linguagem — com a referência completa de métodos.
+---
+
+# API Python
+
+<p className="lede">
+A linguagem é o artefato de pesquisa. O que a maioria dos sistemas precisa é
+menor, e vem como biblioteca: uma coisa que observa o que aconteceu, te diz o que
+é verdade daquilo, recusa deixar você afirmar o que não é, e lembra o que você
+prometeu.
+</p>
+
+```python
+from eleph import Policy
+
+policy = Policy.from_file("booking.eleph")
+assert policy.verify().proved          # o mesmo arquivo, provado estaticamente
+
+g = policy.guard(log="booking.jsonl")  # duravel, reabrir reexecuta
+
+g.record("make_reservation", "alice", "ba117")
+g.holds("has_reservation", "alice", "ba117")                  # True
+g.assert_answer("has_reservation", False, "alice", "ba117")   # levanta erro
+
+g.promise("alice", "has_seat", "alice", "ba117",
+          before=("board", ("alice", "ba117")))
+g.outstanding()        # o que ainda se deve, e a quem
+```
+
+<Callout type="note" title="Esta é a referência">
+Para saber como ligar isso num agente que você já roda, com GPT-4 ou qualquer
+outra coisa, comece em [use no seu agente](/docs/use/start-here). Esta página é o
+que você consulta quando já sabe o nome do que procura.
+</Callout>
+
+## Três formas, da mais barata para a mais cara
+
+| Forma | Você muda | Você ganha |
+|---|---|---|
+| **observador** | nada, você alimenta eventos | o que é verdade do registro, e uma auditoria |
+| **guarda** | asserções e chamadas de ferramenta passam por ela | afirmações sem base levantam erro em vez de irem ao ar |
+| **linguagem** | handlers escritos em `.eleph` | a prova estática |
+
+`python examples/agente.py` roda as três contra
+<Source file="examples/companhia.eleph" />.
+
+<Callout type="proved" title="Por que um arquivo de política em vez de checagens em Python">
+**As regras que sua guarda aplica às três da manhã são o mesmo artefato que um
+solver provou.** Uma guarda cujas regras foram provadas é coisa diferente de uma
+guarda cujas regras alguém acreditou.
+</Callout>
+
+## `Policy`
+
+Uma política parseada: os fatos aos quais um sistema aceita ser cobrado.
+
+```python
+from eleph import Policy
+
+policy = Policy("program p\nevent e(x)\nfact f(X) := e(X)\n")
+policy = Policy.from_file("booking.eleph")
+```
+
+| Membro | Retorna | Notas |
+|---|---|---|
+| `Policy(source)` | | parseia uma política de uma string |
+| `Policy.from_file(path)` | `Policy` | parseia uma política do disco |
+| `.verify(bound=None, objects=None)` | `VerifyReport` | roda o verificador estático sobre os handlers desta política |
+| `.guard(log=None, audit=False)` | `Guard` | uma visão viva de um histórico |
+| `.facts()` | `list[str]` | nomes de fatos declarados |
+| `.events()` | `list[str]` | nomes de eventos declarados, excluindo eventos de fala sintéticos |
+| `.program` | AST | o programa parseado |
+| `.source` | `str` | o texto de onde ele foi parseado |
+
+## `VerifyReport`
+
+```python
+report = policy.verify()
+
+report.proved      # True quando toda obrigacao vale para todo historico
+report.failures    # os resultados que nao se sustentaram
+report.structural  # defeitos estruturais, se houver
+report.results     # todo resultado
+print(report.summary())
+```
+
+`proved` só é `True` quando **não há defeitos estruturais** e todo resultado foi
+descarregado no seu limiar de completude. Um relatório sem contraexemplos mas com
+execução não exaustiva não é `proved`, e `summary()` diz em qual caso você está:
+
+```text
+6 obrigacoes provadas para todo historico
+2 de 6 obrigacoes nao se sustentam
+1 defeito(s) estrutural(is)
+6 obrigacoes sem contraexemplo, nao exaustivo
+```
+
+## `Guard`
+
+Uma visão viva de um histórico: o que é verdade, e o que é devido.
+
+```python
+g = policy.guard(log="booking.jsonl", audit=False)
+```
+
+| Argumento | Efeito |
+|---|---|
+| `log` | caminho de um histórico JSONL append-only. Reabrir reexecuta |
+| `audit` | responde toda consulta **pelos dois caminhos** — pelo índice e relendo o log — e levanta erro se discordarem |
+
+### Histórico
+
+```python
+g.record("make_reservation", "alice", "ba117")
+g.events        # tuple[Event, ...]  eventos do mundo, fala excluida
+```
+
+`record` levanta `UnknownName` se o evento não é declarado ou a aridade está
+errada. É a única forma de qualquer coisa se tornar verdadeira.
+
+### Verdade
+
+```python
+g.holds("has_reservation", "alice", "ba117")        # -> bool
+g.require("has_reservation", "alice", "ba117")      # levanta Ungrounded se nao
+g.assert_answer("has_reservation", True, "alice", "ba117")
+```
+
+| Método | Use para |
+|---|---|
+| `holds(fact, *args)` | perguntar o que é verdade do registro |
+| `require(fact, *args)` | condicionar uma chamada de ferramenta a uma precondição |
+| `assert_answer(fact, value, *args)` | o axioma da resposta, usável direto: diga apenas o que é assim |
+
+`assert_answer` é o que impede um modelo de publicar uma afirmação sem base:
+
+```python
+try:
+    g.assert_answer("has_reservation", model_said_yes, "alice", "ba117")
+except Ungrounded as e:
+    ...   # e: tentou afirmar has_reservation(alice, ba117) = True
+          #    quando o log diz False
+```
+
+### Compromissos
+
+```python
+g.promise("alice", "has_seat", "alice", "ba117")                       # eventually
+g.promise("alice", "has_seat", "alice", "ba117",
+          before=("board", ("alice", "ba117")))                        # antes de um evento
+
+g.release("alice", "has_seat", "alice", "ba117")
+
+g.outstanding()   # list[Commitment]  ainda devido
+g.breached()      # list[Commitment]  nao cumprido
+g.ledger          # list[Commitment]  todo compromisso, com status
+print(g.report())
+```
+
+A promessa é escrita no log como evento. Se ela foi cumprida, quebrada ou liberada
+**decorre dos eventos que vieram depois**, então é recalculado na reexecução em vez
+de armazenado.
+
+## Exceções
+
+| Exceção | Levantada quando |
+|---|---|
+| `Ungrounded` | você afirmou, ou exigiu, algo que o histórico não sustenta |
+| `UnknownName` | você nomeou um evento ou fato que a política não declara, ou errou a aridade |
+| `NotPermitted` | o fato de `permitted` de um handler não vale para este interlocutor |
+| `Refusal` | classe base; o runtime recusou um ato de fala |
+
+`Ungrounded` herda de `Refusal`, então `except Refusal` pega os dois.
+
+## As três formas, em código
+
+### 1. Observador — nada muda
+
+```python
+g = policy.guard()
+
+for event in [("make_reservation", "alice", "ba117"),
+              ("make_reservation", "bruno", "ba117"),
+              ("cancel_reservation", "alice", "ba117")]:
+    g.record(*event)
+
+g.holds("has_reservation", "alice", "ba117")   # False
+g.holds("has_reservation", "bruno", "ba117")   # True
+g.holds("seats_left", "ba117")                 # True
+```
+
+Nada pode quebrar, porque nada é aplicado ainda. É assim que a [auditoria do
+τ-bench](/docs/taubench) funciona sobre traces de terceiros.
+
+### 2. Guarda — o modelo propõe, o log dispõe
+
+```python
+def answer(question, model_said, fact, *args):
+    try:
+        g.assert_answer(fact, model_said, *args)
+        return "sim" if model_said else "nao"
+    except Ungrounded as e:
+        return f"RECUSADO: {e}"
+
+def run_tool(tool, precondition, *args):
+    g.require(precondition, *args)   # levanta erro em vez de prosseguir
+    g.record(tool, *args)
+```
+
+### 3. Livro — sobrevivendo ao processo
+
+```python
+g = policy.guard(log=log)
+g.record("make_reservation", "bruno", "lh42")
+g.promise("bruno", "has_seat", "bruno", "lh42",
+          before=("board", ("bruno", "lh42")))
+
+g.record("board", "bruno", "lh42")     # embarcou sem assento
+g.machine.store.close()
+
+# -- o processo morre aqui --
+
+revivido = policy.guard(log=log)
+print(revivido.report())               # a quebra continua la
+```
+
+Nada foi salvo além de eventos. O livro é derivado.
+
+## Nível mais baixo
+
+Mais duas coisas são exportadas para quando a forma `Guard` não serve.
+
+```python
+from eleph import Machine, Store, Event, Commitment
+```
+
+| Objeto | O que é |
+|---|---|
+| `Machine(program, audit=False)` | o runtime em si: log, índice, livro, transcrição |
+| `Store(path, fsync=False)` | o log JSONL append-only. `fsync=True` dá durabilidade por evento a um custo de cerca de 100× |
+| `Event(name, args)` | um evento imutável |
+| `Commitment` | uma dívida, com `party`, `mode`, `deadline`, `status` |
+
+```python
+m = Machine(policy.program, audit=True).attach(Store("log.jsonl"))
+m.log            # todo evento, fala incluida
+m.transcript     # a troca legivel
+m.outstanding()  # list[Commitment]
+```
+
+<Callout type="note" title="Segurança entre threads">
+Escritores concorrentes são serializados em torno do índice. Um `Store` aberto com
+`fsync=True` escreve direto a cada evento; o padrão agrupa, que é a escolha certa
+a menos que perder a cauda seja pior que uma lentidão de cem vezes.
+</Callout>

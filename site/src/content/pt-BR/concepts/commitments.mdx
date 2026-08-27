@@ -1,0 +1,162 @@
+---
+title: Compromissos
+description: Quatro forças de compromisso, uma checagem estática de cumpribilidade, e um livro derivado do log em vez de armazenado.
+---
+
+# Compromissos
+
+<p className="lede">
+Uma promessa aqui não é texto. É um construto da linguagem, carrega uma obrigação
+que o compilador confere, e o que ainda se deve é derivado do log em vez de
+guardado numa tabela ao lado.
+</p>
+
+## Quatro forças
+
+| Forma | O que afirma | Como é checada |
+|---|---|---|
+| `offer C that φ` | disposto, ainda sem dever — ninguém aceitou | algum caminho poderia honrar φ |
+| `promise C that φ` | φ é **verdadeiro agora** | Z3, sobre o log mais o que este handler acabou de registrar |
+| `promise C eventually φ` | φ vai valer em algum momento | algum caminho torna φ de falsa em verdadeira |
+| `promise C that φ before e(...)` | φ vai valer antes de `e` ocorrer | idem, mais o runtime vigiando `e` |
+
+Uma oferta é a coisa mais fraca que a linguagem consegue dizer, e é
+deliberadamente separada de uma promessa: o que ela deve é apenas não ser vazia.
+Adicionada no 0.3.0.
+
+## A promessa imediata
+
+```eleph
+on request(Caller, make_reservation(P, F)):
+    if has_reservation(P, F):
+        decline Caller
+    else:
+        record make_reservation(P, F)
+        accept Caller
+        promise Caller that has_reservation(P, F)
+```
+
+`promise C that φ` afirma que φ vale no instante em que é dito, então a obrigação
+é descarregada sobre o log **mais o que este handler registrou no caminho até
+aqui**. A promessa acima só é provável porque o `record` veio antes. Troque as
+duas linhas e a checagem falha.
+
+```out
+  ok  request(C, make_reservation)  linha 45  -  a promessa esta cumprida ao ser feita
+```
+
+## A promessa futura
+
+```eleph
+promise C that has_seat(P, F) before board(P, F)
+```
+
+Isso não pode ser verdadeiro quando dito — é o que a torna uma promessa futura. O
+que o compilador prova é que **algum caminho pelo programa a estabelece**, e exige
+que esse caminho a torne de falsa em verdadeira:
+
+```out
+  ok  request(C, make_reservation)  linha 46  -  a promessa pode vir a ser cumprida (antes de board(P, F))
+      cumprivel por: request assign_seat > entao l51
+```
+
+O trace nomeia o caminho — aqui, o handler do pedido `assign_seat`.
+
+<Callout type="limit" title="Cumprível, não vivo">
+O compilador prova que um caminho existe. Ele não pode provar que o interlocutor
+vai percorrê-lo, porque nenhum programa pode. O que acontece quando não percorre
+é exatamente para o que o livro serve.
+</Callout>
+
+## O livro
+
+Um compromisso tem quatro estados:
+
+| Status | Significado |
+|---|---|
+| `ABERTA` | em aberto — feita e ainda não quitada |
+| `CUMPRIDA` | cumprida |
+| `QUEBRADA` | quebrada — o evento-prazo ocorreu com a promessa ainda falsa |
+| `LIBERADA` | liberada — o programa foi dispensado da dívida por `release C from φ` |
+
+Rode a companhia aérea contra uma sessão em que um passageiro recebe assento e
+outro embarca sem:
+
+```out
+$ eleph run examples/companhia.eleph examples/voo.session --log /tmp/voo.jsonl
+
+  alice: request assign_seat(alice, ba117)
+      [log] assign_seat(alice, ba117)
+      [livro] cumprida -- a alice: (assign_seat(alice, ba117) e desde entao
+              nenhum cancel_reservation(alice, ba117)) (antes de board(alice, ba117))
+      programa: aceito
+  [log] board(bruno, ba117)   (historico pre-existente)
+      [livro] QUEBRADA -- a bruno: (assign_seat(bruno, ba117) e desde entao
+              nenhum cancel_reservation(bruno, ba117)) (antes de board(bruno, ba117))
+
+  livro de compromissos
+    CUMPRIDA  a alice: ...
+    QUEBRADA  a bruno: ...
+
+  1 promessa quebrada
+```
+
+A promessa do Bruno foi quebrada por um evento, não por um timer. `since_not` sabe
+ordem, não tempo — veja [os limites](/docs/limits).
+
+## O livro é derivado, não armazenado
+
+Compromissos são registrados como eventos. O livro é recalculado reexecutando-os,
+que é por que reabrir um log devolve as mesmas dívidas:
+
+```bash
+eleph ledger examples/companhia.eleph /tmp/voo.jsonl
+```
+
+```out
+/tmp/voo.jsonl
+  22 eventos (4 do mundo, 18 de fala)
+
+  CUMPRIDA  a alice: ...
+  QUEBRADA  a bruno: ...
+
+  1 promessa quebrada
+```
+
+Se uma dívida foi cumprida, quebrada ou liberada **decorre dos eventos que vieram
+depois dela**, então é recalculado em vez de fotografado. Não existe estado que
+pudesse discordar do histórico.
+
+## Liberando uma dívida
+
+```eleph
+on request(C, cancel_reservation(P, F)):
+    if has_reservation(P, F):
+        record cancel_reservation(P, F)
+        accept C
+        promise C that not has_reservation(P, F)
+        release C from has_seat(P, F)
+    else:
+        decline C
+```
+
+Cancelar torna a promessa de assento incumprível, então o programa se dispensa
+dela explicitamente. `release` é um ato de fala como qualquer outro e vai para o
+log; uma dívida silenciosamente abandonada e uma dívida formalmente liberada são
+históricos diferentes.
+
+## A partir do Python
+
+As mesmas quatro forças estão disponíveis sem escrever handlers:
+
+```python
+g.promise("alice", "has_seat", "alice", "ba117",
+          before=("board", ("alice", "ba117")))
+
+g.outstanding()   # [Commitment(...)]  ainda devido
+g.breached()      # [Commitment(...)]  nao cumprido
+g.release("alice", "has_seat", "alice", "ba117")
+g.ledger          # todo compromisso, com seu status
+```
+
+Veja a [API Python](/docs/python-api).

@@ -1,0 +1,139 @@
+---
+title: Prova, não amostragem
+description: Um limiar de completude computável transforma "nenhum contraexemplo até N" em "nenhum contraexemplo existe".
+---
+
+# Prova, não amostragem
+
+<p className="lede">
+Model checking limitado responde uma pergunta mais fraca do que queremos: nenhum
+histórico <em>até o tamanho N</em> quebra a obrigação. Para o fragmento desta
+linguagem essa lacuna fecha, porque um limiar computável faz "nenhum contraexemplo
+encontrado" significar "nenhum existe".
+</p>
+
+## Por que um limite fixo não basta
+
+O `examples/fundo.eleph` afirma status elite com sete reservas quando o fato exige
+oito. Um limite de seis aprova:
+
+```out
+$ eleph check examples/fundo.eleph --bound 6
+
+  ok? question(C, elite)  linha 11  -  resposta yes e verdadeira
+  ok? question(C, elite)  linha 13  -  resposta no e verdadeira
+
+SEM CONTRAEXEMPLO  -  dentro dos limites checados, que nao sao exaustivos aqui
+```
+
+Repare no vocabulário. `ok?` em vez de `ok`, e `SEM CONTRAEXEMPLO` em vez de
+`PROVADO`. A ferramenta nunca alega mais do que checou. Um limite fixo de seis era
+o comportamento no 0.1.0, e era incorreto — este exemplo é a razão de ter mudado.
+
+## O lema da última ocorrência
+
+A verdade de uma fórmula no fim de um histórico depende apenas da **ordem da
+última ocorrência de cada átomo**, mais, para átomos sob um `count`, quantas vezes
+ocorreram, saturando em *n*+1.
+
+Leia os operadores e é quase imediato:
+
+| Operador | O que ele de fato pergunta ao histórico |
+|---|---|
+| `a(x)` | existe uma última ocorrência de `a(x)` |
+| `a since_not b` | a última ocorrência de `a` existe e vem depois da de `b` |
+| `count a >= n` | quantas ocorrências, saturando em *n*+1 |
+
+Os conectivos booleanos compõem, e um quantificador é uma disjunção ou soma finita
+de instâncias que também estão no fragmento.
+
+## O limiar
+
+Qualquer configuração que o lema admite é realizada por um histórico com uma
+posição por átomo, então
+
+```text
+N  =  soma sobre atomos DISTINTOS a de k(a),    k(a) = 1, ou n_max(a)+1 sob um count
+```
+
+é um limiar de completude. Insatisfazibilidade até `N` é insatisfazibilidade
+absoluta.
+
+Dois detalhes importam para isso ser usável, e não só correto.
+
+**A soma corre sobre átomos distintos, não nós de sintaxe.** `once(a) and count(a)
+> 2` pede uma ocorrência e pede três; três ocorrências respondem as duas. Contar
+por nó ainda é um limiar válido, só desnecessariamente grande — e limiares grandes
+são o que torna uma execução exaustiva impagável. Fazer essa mudança no 0.2.0
+cortou os limiares em cerca de três vezes e deixou a suíte mais rápida.
+
+**O domínio também é limitado.** Um objeto sem nenhuma ocorrência no histórico
+falsifica todo átomo que o nomeia, então quantificar sobre os objetos que aparecem
+é o mesmo que quantificar sobre um universo ilimitado. `W` objetos distintos
+bastam: uma testemunha por existencial, *n*+1 por quantificador de contagem, mais
+as variáveis livres da própria obrigação.
+
+Cada obrigação é checada no **seu próprio** limiar, então um fato caro não
+desacelera o resto do arquivo:
+
+```out
+6 obrigacoes derivadas do texto do programa
+cada uma checada no seu limiar de completude (o maior: 10 eventos) -- exaustivo
+
+PROVADO  -  6 obrigacoes valem para TODO historico, de qualquer tamanho
+```
+
+## Fora do fragmento linear
+
+A hipótese que pode falhar é a de que todo `since_not` recebe **átomos**. Um fato
+cujo corpo põe uma expressão composta ali sai do fragmento.
+
+Esse caso não perde completude, só o limite linear. Todo operador de passado tem
+uma recorrência de um passo — `once` e `since_not` carregam um bit cada, `count`
+um contador saturando em *n*+1 — então uma fórmula com *k* subfórmulas temporais é
+avaliada por um monitor determinístico sobre
+
+```text
+S  =  2^k  ×  produto de (n_i + 2)
+```
+
+estados. Se algum histórico chega a um estado violador, algum chega sem repetir
+estado, logo em menos de `S` passos. Então `S` é um limiar de completude para a
+linguagem inteira.
+
+Quantificadores multiplicam *k* pelo tamanho do domínio, já que uma instância por
+objeto é rastreada. Isso é exponencial em princípio e pequeno na prática.
+
+<Callout type="limit" title="Quando nem isso é pagável">
+Acima de um teto de 4096, uma execução exaustiva não vale a espera. O verificador
+então diz que a execução não foi exaustiva em vez de fingir, e marca cada
+obrigação afetada com o motivo:
+
+```out
+verificacao NAO exaustiva neste programa
+  linha 11: limite pedido abaixo do limiar
+```
+</Callout>
+
+## O vocabulário, exatamente
+
+| Veredito | O que significa |
+|---|---|
+| `PROVADO` | toda obrigação vale para **todo** histórico, de qualquer tamanho |
+| `SEM CONTRAEXEMPLO` | nada quebrou dentro dos limites checados, que não foram exaustivos aqui |
+| `REPROVADO` | ao menos uma obrigação tem contraexemplo, impresso como histórico |
+| `ok` | esta obrigação foi descarregada no seu limiar de completude |
+| `ok?` | esta obrigação sobreviveu ao limite dado, que estava abaixo do limiar |
+
+## Testando a própria alegação
+
+O limiar é uma alegação como qualquer outra, então existe um experimento que a
+quebraria: **nenhum veredito pode mudar acima do limiar calculado.** É testado
+rechecando toda obrigação de todo exemplo em limites e domínios acima dele, em
+<Source file="tests/test_soundness.py" />.
+
+O argumento completo, com as provas, é a docstring de módulo de
+<Source file="eleph/threshold.py" />. Os dois teoremas são provados no papel e
+testados, não mecanizados; um artefato em Lean 4 para o fragmento ground é a
+próxima coisa que vale construir, e é [onde há
+demanda](/docs/contributing).

@@ -1,0 +1,139 @@
+---
+title: Contribuir
+description: A regra única, o que é uma boa mudança, e os cinco lugares onde há demanda.
+---
+
+# Contribuir
+
+<p className="lede">
+Algumas coisas sobre como este projeto funciona que vale saber antes de gastar
+tempo nele. A cópia canônica é o <a
+href="https://github.com/dev-isaacmello/eleph/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a>.
+</p>
+
+## A regra única
+
+<Callout type="danger" title="Não publique um número que você não leu à mão.">
+Toda alegação quantitativa deste repositório sobreviveu a uma auditoria de casos
+individuais, e **três delas mudaram por causa disso**. A primeira contagem de
+escritas sem confirmação cobrava um lote sob um só `yes`. A segunda chamava um
+upgrade-e-depois-cancelamento de violação, o que a política permite expressamente. A
+terceira modelava um atributo mutável com "aconteceu uma vez". Cada correção deixou
+o número **menor** e a alegação mais forte.
+
+Se você adicionar uma medição, adicione a auditoria manual que a justifica, e diga
+na docstring o que você conferiu.
+</Callout>
+
+## Setup
+
+```bash
+uv venv && uv pip install -e ".[dev]"
+pytest -q
+```
+
+Os testes do τ-bench baixam cerca de 6 MB na primeira execução e pulam limpo sem
+rede.
+
+## O que é uma boa mudança
+
+* **Um teste que falharia sem ela.** Testes aqui são o argumento, não a obrigação.
+  <Source file="tests/test_soundness.py" /> e
+  <Source file="tests/test_incremental.py" /> existem para tentar quebrar alegações
+  feitas em outros pontos do código; esse é o formato a copiar.
+* **Um limite honesto, se a mudança tiver um.** A lista de [limites
+  honestos](/docs/limits) não é hedge de marketing. Ela é verificada, e cada entrada
+  está lá porque algo genuinamente não está coberto. **Acrescentar a ela é uma
+  contribuição.**
+* **Comentários que dizem por quê, não o quê.** O código é lido por gente decidindo
+  se confia nele.
+
+## Lugares onde há demanda
+
+| Onde | O quê | Tamanho |
+|---|---|---|
+| **Lean 4** | Mecanizar os dois teoremas, restritos ao fragmento ground. Não existe nada para portar no mathlib, Rocq ou Isabelle, então isto seria, até onde sabemos, o **primeiro limiar de completude mecanizado para uma linguagem de especificação temporal**. | cinco a nove dias úteis |
+| **Um relógio de parede** | `since_not` sabe ordem, não tempo. Eventos com timestamp e comparação de intervalo exigiriam refazer o argumento de completude. | tamanho de pesquisa, não de fim de semana |
+| **Dados em eventos** | Campos de payload tipados sobrevivem à abstração da última ocorrência se os predicados forem por evento, mas a codificação Z3 e o limiar precisam de trabalho. | |
+| **Mais regras do τ-bench** | Franquia de bagagem por categoria e cabine é a próxima óbvia. | |
+| **Snapshot** | Abrir um log de dez milhões de eventos reexecuta todos os dez milhões. Um snapshot que possa ser **conferido** contra o log, em vez de confiado, manteria a propriedade derivada. | |
+
+## Estilo
+
+Siga o código ao redor. **Português nas strings de CLI voltadas ao usuário, inglês
+em identificadores, docstrings e comentários.** Não use o caractere travessão.
+
+## Publicando uma versão
+
+Empurrar uma tag publica. O `.github/workflows/release.yml` faz o trabalho, e a
+maior parte do que ele faz é se recusar.
+
+```bash
+# 1. mude a fonte unica da verdade
+$EDITOR pyproject.toml        # version = "0.4.0"
+
+# 2. diga o que mudou
+$EDITOR CHANGELOG.md
+
+# 3. commit, tag, push
+git commit -am "chore: release 0.4.0"
+git tag -a v0.4.0 -m "eleph 0.4.0"
+git push origin main --tags
+```
+
+O workflow então confere, nesta ordem:
+
+<Steps>
+<li>a tag concorda com o `pyproject.toml`;</li>
+<li>a versão nunca foi publicada — o PyPI nunca deixa uma versão ser substituída ou
+reusada, então este é o último momento em que dá para pegar;</li>
+<li>os testes passam no interpretador mais antigo e no mais novo suportados;</li>
+<li>os artefatos estão bem formados;</li>
+<li>a wheel construída instala num ambiente limpo e ainda prova e recusa os
+programas certos.</li>
+</Steps>
+
+Só então ele faz upload, e corta um release no GitHub com os artefatos anexados.
+
+<Callout type="note" title="O 3.11 nessa lista não é cerimônia">
+O único bug que chegou a uma versão publicada foi um erro de sintaxe que só o 3.11
+viu.
+</Callout>
+
+`__version__` é lido dos metadados do pacote instalado em vez de escrito uma segunda
+vez. Uma versão repetida em dois arquivos é uma versão que vai acabar discordando de
+si mesma, em silêncio, numa release.
+
+### Configurando
+
+O workflow precisa de um segredo de repositório, `PYPI_API_TOKEN`, **com escopo
+neste projeto e não na conta inteira**. Ele roda num ambiente do GitHub chamado
+`pypi`, então revisores obrigatórios podem ser adicionados ali se os uploads
+precisarem de aprovação humana.
+
+Para ensaiar sem publicar nada, rode o workflow manualmente pela aba Actions com o
+`dry_run` marcado: tudo acontece menos o upload.
+
+Trusted publishing é o arranjo melhor se você preferir não guardar token nenhum, e
+substituiria o segredo por uma troca OIDC.
+
+## Este site de documentação
+
+O site vive em <Source file="site" /> — Vite, React e MDX, publicado na Vercel. O
+conteúdo é um arquivo MDX por página em `src/content/<locale>/`, e a barra lateral é
+`src/lib/nav.ts`: uma página não pode existir sem ser alcançável, nem ser alcançável
+sem existir.
+
+Todo bloco de terminal deste site é uma execução real, colada. Se você mudar a saída
+que o CLI produz, as páginas que a citam precisam ser recoladas, não editadas.
+
+```bash
+cd site
+npm install
+npm run dev
+```
+
+## Licença
+
+Ao contribuir você concorda que seu trabalho é liberado sob a licença MIT em
+<Source file="LICENSE" />.

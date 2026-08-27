@@ -1,0 +1,139 @@
+---
+title: Gramática
+description: A sintaxe de superfície completa do eleph, palavras-chave e regras léxicas.
+---
+
+# Gramática
+
+<p className="lede">
+A sintaxe de superfície inteira, num lugar só. Ela é pequena de propósito.
+</p>
+
+## Notação
+
+`x*` é zero ou mais, `x+` é um ou mais, `[x]` é opcional, `|` é alternativa.
+`INDENT` e `DEDENT` são produzidos pelo lexer a partir dos espaços iniciais,
+estilo Python.
+
+## Programa
+
+```text
+program        ::= "program" IDENT NEWLINE decl*
+
+decl           ::= sort_decl | event_decl | fact_decl | handler
+
+sort_decl      ::= "sort" IDENT NEWLINE
+event_decl     ::= "event" IDENT param_list NEWLINE
+fact_decl      ::= "fact" IDENT param_list ":=" texpr NEWLINE
+
+param_list     ::= [ "(" [ param ("," param)* ] ")" ]
+param          ::= IDENT [ ":" IDENT ]
+```
+
+## Handlers
+
+```text
+handler        ::= "on" performative "(" IDENT "," ref ")"
+                   [ "permitted" ref ] ":" NEWLINE block
+
+performative   ::= "question" | "request"
+
+block          ::= INDENT stmt+ DEDENT
+```
+
+## Comandos
+
+```text
+stmt           ::= if_stmt
+                 | answer_stmt
+                 | "record" ref NEWLINE
+                 | ("accept" | "decline") IDENT [ ref ] NEWLINE
+                 | promise_stmt
+                 | "offer" IDENT "that" texpr NEWLINE
+                 | "release" IDENT "from" texpr NEWLINE
+
+if_stmt        ::= "if" texpr ":" NEWLINE block
+                   [ "else" ":" NEWLINE block ]
+
+answer_stmt    ::= "answer" IDENT ( "yes" | "no" | "with" texpr ) NEWLINE
+
+promise_stmt   ::= "promise" IDENT "eventually" texpr NEWLINE
+                 | "promise" IDENT "that" texpr [ "before" ref ] NEWLINE
+```
+
+## Expressões temporais
+
+```text
+texpr          ::= or_expr
+or_expr        ::= and_expr ( "or" and_expr )*
+and_expr       ::= since_expr ( "and" since_expr )*
+since_expr     ::= unary [ "since_not" unary ]
+unary          ::= "not" unary | primary
+
+primary        ::= "(" texpr ")"
+                 | "yes" | "no"
+                 | "exists" binder since_expr
+                 | "count" binder since_expr comparison
+                 | "count" ref comparison
+                 | "spoke" perf "to" IDENT "about" ref
+                 | ref
+
+binder         ::= IDENT ":" IDENT "where"
+comparison     ::= OP NUMBER
+perf           ::= "answer" | "accept" | "decline" | "promise" | "ask"
+
+ref            ::= IDENT [ "(" [ arg ("," arg)* ] ")" ]
+arg            ::= IDENT [ OP NUMBER ]
+```
+
+A produção `arg` com uma comparação é a forma de campo numérico:
+`charged(U, C, amount > 100)`.
+
+## Tokens
+
+```text
+NUMBER   ::= [0-9]+
+IDENT    ::= [A-Za-z_][A-Za-z_0-9]*
+ASSIGN   ::= ":="
+OP       ::= ">=" | "<=" | "==" | "!=" | "<" | ">"
+PUNCT    ::= "(" | ")" | ":" | ","
+COMMENT  ::= "#" .*
+```
+
+## Palavras-chave
+
+Reservadas, e inutilizáveis como identificadores:
+
+```text
+program  event  fact  on  if  else  answer  with
+yes  no  record  accept  decline  promise  that
+not  and  or  since_not  count  to
+sort  exists  where
+spoke  about
+eventually  before  release  from
+permitted  offer
+```
+
+A lista está em <Source file="eleph/lexer.py" />, nesta ordem.
+
+## Regras léxicas
+
+* Linhas em branco e linhas só de comentário **não carregam significado de
+  indentação**.
+* A indentação tem que usar espaços. Um tab no espaço inicial é erro:
+  `linha N: use espacos, nao tabs, para indentar`.
+* Um dedent tem que voltar a um nível previamente aberto, ou:
+  `linha N: indentacao inconsistente`.
+* Não há continuação de linha. Uma expressão que atravessa linhas tem que estar
+  entre parênteses dentro de um bloco já indentado — na prática, mantenha fatos
+  numa linha ou quebre depois do `:=`.
+
+## Erros
+
+Três tipos de exceção chegam ao CLI, e os três saem com status `2`:
+
+| Exceção | Levantada por | Mensagem de exemplo |
+|---|---|---|
+| `LexError` | <Source file="eleph/lexer.py" /> | `linha 4: caractere inesperado '@'` |
+| `ParseError` | <Source file="eleph/parser.py" /> | `linha 9: esperava 'yes', 'no' ou 'with'` |
+| `ResolveError` | <Source file="eleph/core.py" /> | um nome desconhecido, ou aridade ou sort divergente |

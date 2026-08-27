@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 
+import { useLocale } from '@/lib/locale'
+import { withLocale } from '@/lib/nav'
 import { highlight, search, type Record } from '@/lib/search'
 import { IconSearch } from './Icons'
 
@@ -22,8 +24,9 @@ export function Search() {
   const [query, setQuery] = useState('')
   const [active, setActive] = useState(0)
   const navigate = useNavigate()
+  const { locale, t } = useLocale()
 
-  const results = useMemo(() => search(query), [query])
+  const results = useMemo(() => search(query, locale), [query, locale])
 
   const open = useCallback(() => {
     setQuery('')
@@ -38,9 +41,9 @@ export function Search() {
   const go = useCallback(
     (record: Record) => {
       close()
-      navigate(record.route + record.hash)
+      navigate(withLocale(locale, record.route) + record.hash)
     },
-    [close, navigate],
+    [close, navigate, locale],
   )
 
   useEffect(() => {
@@ -83,7 +86,7 @@ export function Search() {
     <>
       <button type="button" className="search-trigger" onClick={open}>
         <IconSearch />
-        <span className="search-trigger__text">Search the docs</span>
+        <span className="search-trigger__text">{t.searchPlaceholderShort}</span>
         <span className="search-trigger__kbd" aria-hidden="true">
           ⌘K
         </span>
@@ -92,7 +95,7 @@ export function Search() {
       <dialog
         ref={dialog}
         className="search-dialog"
-        aria-label="Search the documentation"
+        aria-label={t.searchLabel}
         onClick={(e) => {
           if (e.target === dialog.current) close()
         }}
@@ -103,7 +106,7 @@ export function Search() {
             ref={input}
             type="search"
             value={query}
-            placeholder="Search pages, concepts, statements…"
+            placeholder={t.searchPlaceholder}
             autoComplete="off"
             spellCheck={false}
             onChange={(e) => {
@@ -116,7 +119,7 @@ export function Search() {
 
         {query && results.length === 0 ? (
           <p className="search-dialog__empty">
-            Nothing matches <strong>{query}</strong>.
+            {t.searchEmptyPrefix} <strong>{query}</strong>.
           </p>
         ) : null}
 
@@ -151,20 +154,20 @@ export function Search() {
 
         {!query ? (
           <p className="search-dialog__empty">
-            Type to search. Try <strong>since_not</strong>, <strong>promise</strong> or{' '}
-            <strong>threshold</strong>.
+            {t.searchHint} <strong>since_not</strong>, <strong>promise</strong>,{' '}
+            <strong>guard</strong>.
           </p>
         ) : null}
 
         <div className="search-dialog__foot">
           <span>
-            <kbd>↑</kbd> <kbd>↓</kbd> to navigate
+            <kbd>↑</kbd> <kbd>↓</kbd> {t.searchNavigate}
           </span>
           <span>
-            <kbd>↵</kbd> to open
+            <kbd>↵</kbd> {t.searchOpen}
           </span>
           <span>
-            <kbd>esc</kbd> to close
+            <kbd>esc</kbd> {t.searchClose}
           </span>
         </div>
       </dialog>

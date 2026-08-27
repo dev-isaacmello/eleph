@@ -97,8 +97,20 @@ await fs.mkdir(path.dirname(OUT), { recursive: true })
 await fs.writeFile(OUT, JSON.stringify(records), 'utf8')
 
 // The sitemap comes from the same walk, so a page cannot be documented and
-// unlisted, or listed and absent.
-const routes = ['/', ...new Set(records.map((r) => r.route))].sort()
+// unlisted, or listed and absent. Routes are canonical; the locale prefix is
+// applied here, the same way the site applies it.
+const DEFAULT_LOCALE = 'en'
+const locales = [...new Set(records.map((r) => r.locale))].sort()
+const withLocale = (locale, route) =>
+  locale === DEFAULT_LOCALE ? route : `/${locale}${route === '/' ? '' : route}`
+
+const byLocale = new Map(
+  locales.map((locale) => [
+    locale,
+    ['/', ...new Set(records.filter((r) => r.locale === locale).map((r) => r.route))].sort(),
+  ]),
+)
+const routes = [...byLocale].flatMap(([locale, rs]) => rs.map((r) => withLocale(locale, r)))
 
 // A sitemap entry must be an absolute URL, so without a known origin there is
 // nothing honest to write. Say so rather than guessing at a domain.
@@ -107,8 +119,26 @@ if (ORIGIN) {
     SITEMAP,
     [
       '<?xml version="1.0" encoding="UTF-8"?>',
-      '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">',
-      ...routes.map((r) => `  <url><loc>${ORIGIN}${r}</loc></url>`),
+      '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"',
+      '        xmlns:xhtml="http://www.w3.org/1999/xhtml">',
+      // Each page lists its translations, so a search engine serves a reader
+      // the language they are actually reading in.
+      ...[...byLocale].flatMap(([locale, rs]) =>
+        rs.map((route) =>
+          [
+            '  <url>',
+            `    <loc>${ORIGIN}${withLocale(locale, route)}</loc>`,
+            ...[...byLocale]
+              .filter(([other, others]) => others.includes(route) || route === '/')
+              .map(
+                ([other]) =>
+                  `    <xhtml:link rel="alternate" hreflang="${other}" ` +
+                  `href="${ORIGIN}${withLocale(other, route)}"/>`,
+              ),
+            '  </url>',
+          ].join('\n'),
+        ),
+      ),
       '</urlset>',
       '',
     ].join('\n'),

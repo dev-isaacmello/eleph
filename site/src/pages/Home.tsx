@@ -3,15 +3,21 @@ import { Link } from 'react-router-dom'
 
 import { mdxComponents } from '@/components/mdx'
 import { IconArrowRight, IconCheck, IconCopy, IconGitHub } from '@/components/Icons'
+import { useLocale } from '@/lib/locale'
 import { site } from '@/lib/site'
 
 import AirlineBuggy from '@/snippets/airline-buggy.mdx'
 import CheckOutput from '@/snippets/check-output.mdx'
 import Fact from '@/snippets/fact.mdx'
 import PythonApi from '@/snippets/python.mdx'
+import { HOME } from './home-copy'
+
+/** Snippets on this page are decoration around prose; they keep their own frame. */
+const BARE = { ...mdxComponents, pre: 'pre' as const }
 
 function InstallPill() {
   const [copied, setCopied] = useState(false)
+  const { t } = useLocale()
   const copy = useCallback(async () => {
     try {
       await navigator.clipboard.writeText('pip install eleph')
@@ -28,32 +34,47 @@ function InstallPill() {
         $
       </span>
       pip install eleph
-      <button type="button" onClick={copy} aria-label={copied ? 'Copied' : 'Copy install command'}>
+      <button type="button" onClick={copy} aria-label={copied ? t.copied : t.copy}>
         {copied ? <IconCheck /> : <IconCopy />}
       </button>
     </span>
   )
 }
 
+function Cards({ items, href }: { items: HomeCards; href: (to: string) => string }) {
+  return (
+    <div className="cards">
+      {items.map((c) => (
+        <Link className="card" key={c.to} to={href(c.to)}>
+          <span className="card__kicker">{c.kicker}</span>
+          <span className="card__title">{c.title}</span>
+          <span className="card__body">{c.body}</span>
+        </Link>
+      ))}
+    </div>
+  )
+}
+
+type HomeCards = { kicker: string; title: string; body: string; to: string }[]
+
 export function Home() {
+  const { locale, href } = useLocale()
+  const c = HOME[locale] ?? HOME.en
+
   return (
     <main id="main" className="home">
       <section className="hero" style={{ borderTop: 0 }}>
         <span className="hero__eyebrow">
-          <strong>v{site.version}</strong> · John McCarthy’s Elephant 2000, implemented
+          <strong>v{site.version}</strong> · {c.eyebrow}
         </span>
-        <h1>A language whose programs cannot lie.</h1>
-        <p className="hero__sub">
-          Speech acts, a history that is the only state, and correctness conditions derived
-          from the program text rather than written beside it. You do not write the
-          conditions. The compiler reads them off the program, then tries to break them.
-        </p>
+        <h1>{c.title}</h1>
+        <p className="hero__sub">{c.sub}</p>
         <div className="hero__actions">
-          <Link className="button button--primary" to="/docs/use/start-here">
-            Use it in your agent <IconArrowRight />
+          <Link className="button button--primary" to={href('/docs/use/start-here')}>
+            {c.ctaPrimary} <IconArrowRight />
           </Link>
-          <Link className="button button--ghost" to="/docs/quickstart">
-            See the language
+          <Link className="button button--ghost" to={href('/docs/quickstart')}>
+            {c.ctaSecondary}
           </Link>
           <InstallPill />
           <a className="button button--ghost" href={site.repo} target="_blank" rel="noreferrer">
@@ -64,16 +85,9 @@ export function Home() {
 
       {/* The whole argument, in two panels. */}
       <section>
-        <p className="section__label">The bug is one word</p>
-        <h2 className="section__title">
-          The guard asks <em>did they make a reservation</em> where it should ask{' '}
-          <em>do they have one</em>.
-        </h2>
-        <p className="section__lede">
-          Those are different questions, and the difference is the cancellation. This is
-          McCarthy’s own example, and the whole language exists to make that difference
-          impossible to overlook.
-        </p>
+        <p className="section__label">{c.bugLabel}</p>
+        <h2 className="section__title">{c.bugTitle}</h2>
+        <p className="section__lede">{c.bugLede}</p>
 
         <div className="demo">
           <div className="panel">
@@ -82,170 +96,69 @@ export function Home() {
               examples/airline_buggy.eleph
             </div>
             <div className="prose">
-              <AirlineBuggy components={{ ...mdxComponents, pre: 'pre' }} />
+              <AirlineBuggy components={BARE} />
             </div>
-            <p className="panel__note">
-              Nothing here is annotated with a contract. There is no assertion, no
-              invariant, no test.
-            </p>
+            <p className="panel__note">{c.bugPanelNote}</p>
           </div>
 
           <div className="panel">
             <div className="panel__head">
               <span className="panel__dot panel__dot--ok" />
-              what the checker says
+              {c.checkerPanel}
             </div>
             <div className="prose">
-              <CheckOutput components={{ ...mdxComponents, pre: 'pre' }} />
+              <CheckOutput components={BARE} />
             </div>
-            <p className="panel__note">
-              Not a failing test: a history that breaks the obligation, printed back at
-              you.
-            </p>
+            <p className="panel__note">{c.checkerNote}</p>
           </div>
         </div>
       </section>
 
       <section>
-        <p className="section__label">The past is the only state</p>
-        <h2 className="section__title">There is no assignment in the grammar.</h2>
-        <p className="section__lede">
-          This is not an omission. There is nothing to assign to, because a fact is not
-          stored — it is a query over what happened. An elephant never forgets, so nothing
-          is overwritten and nothing can drift out of agreement with the truth.
-        </p>
+        <p className="section__label">{c.stateLabel}</p>
+        <h2 className="section__title">{c.stateTitle}</h2>
+        <p className="section__lede">{c.stateLede}</p>
         <div className="demo">
           <div className="panel">
             <div className="panel__head">
-              <span className="panel__dot" />a fact, which is a formula about the log
+              <span className="panel__dot" />
+              {c.factPanel}
             </div>
             <div className="prose">
-              <Fact components={{ ...mdxComponents, pre: 'pre' }} />
+              <Fact components={BARE} />
             </div>
-            <p className="panel__note">
-              The program’s own utterances go into the same log, so it can be asked what it
-              has already said.
-            </p>
+            <p className="panel__note">{c.factNote}</p>
           </div>
-          <div className="cards" style={{ marginTop: 0 }}>
-            <Link className="card" to="/docs/concepts/past-is-state">
-              <span className="card__kicker">Concept</span>
-              <span className="card__title">A history that is the state</span>
-              <span className="card__body">
-                Why there is no assignment, and what replaces it.
-              </span>
-            </Link>
-            <Link className="card" to="/docs/concepts/completeness">
-              <span className="card__kicker">Concept</span>
-              <span className="card__title">Proof, not spot check</span>
-              <span className="card__body">
-                A computable threshold turns “no counterexample found” into “none exists”.
-              </span>
-            </Link>
-          </div>
+          <Cards items={c.cards.slice(0, 2)} href={href} />
         </div>
       </section>
 
       <section>
-        <p className="section__label">Two obligations, both McCarthy’s</p>
-        <h2 className="section__title">An answer must be true. A promise must be kept.</h2>
-        <p className="section__lede">
-          Every <code>yes</code> or <code>no</code> must be entailed by the log. The program
-          cannot promise what its history does not establish, nor promise what no path
-          through it could ever bring about.
-        </p>
-        <div className="cards">
-          <Link className="card" to="/docs/concepts/obligations">
-            <span className="card__kicker">Derived</span>
-            <span className="card__title">Ten obligations</span>
-            <span className="card__body">
-              Discharged by Z3 at the completeness threshold, or structurally by the
-              compiler. Nobody writes them.
-            </span>
-          </Link>
-          <Link className="card" to="/docs/concepts/commitments">
-            <span className="card__kicker">Runtime</span>
-            <span className="card__title">Four strengths of commitment</span>
-            <span className="card__body">
-              Offer, immediate promise, eventual promise, promise before an event — with a
-              ledger that says what is still owed.
-            </span>
-          </Link>
-          <Link className="card" to="/docs/concepts/permission">
-            <span className="card__kicker">Authority</span>
-            <span className="card__title">Whether you were entitled to ask</span>
-            <span className="card__body">
-              An agent that truthfully reports any customer’s balance to whoever asks has
-              told no lie at all. It is still an incident.
-            </span>
-          </Link>
-        </div>
+        <p className="section__label">{c.obligationsLabel}</p>
+        <h2 className="section__title">{c.obligationsTitle}</h2>
+        <p className="section__lede">{c.obligationsLede}</p>
+        <Cards items={c.cards} href={href} />
       </section>
 
       <section>
-        <p className="section__label">Measured, not asserted</p>
-        <h2 className="section__title">Every number here was read by hand first.</h2>
+        <p className="section__label">{c.measuredLabel}</p>
+        <h2 className="section__title">{c.measuredTitle}</h2>
         <div className="stats">
-          <div className="stat">
-            <div className="stat__value">146</div>
-            <div className="stat__label">tests, run on 3.11, 3.12 and 3.13</div>
-            <div className="stat__source">pytest -q</div>
-          </div>
-          <div className="stat">
-            <div className="stat__value">~24k</div>
-            <div className="stat__label">events per second, flat as the log grows</div>
-            <div className="stat__source">bench/scaling.py</div>
-          </div>
-          <div className="stat">
-            <div className="stat__value">200</div>
-            <div className="stat__label">published τ-bench trajectories replayed</div>
-            <div className="stat__source">bench/taubench/</div>
-          </div>
-          <div className="stat">
-            <div className="stat__value">45/45</div>
-            <div className="stat__label">
-              guarded agent runs passing, against 30/45 unguarded. Claude Haiku 4.5, nine
-              cases, five runs each
+          {c.stats.map((s) => (
+            <div className="stat" key={s.source + s.value}>
+              <div className="stat__value">{s.value}</div>
+              <div className="stat__label">{s.label}</div>
+              <div className="stat__source">{s.source}</div>
             </div>
-            <div className="stat__source">examples/langchain-agent</div>
-          </div>
+          ))}
         </div>
-        <div className="cards">
-          <Link className="card" to="/docs/performance">
-            <span className="card__kicker">Performance</span>
-            <span className="card__title">Constant time per event</span>
-            <span className="card__body">
-              One-step recurrences plus a locality lemma, audited against the naive
-              evaluator on every query.
-            </span>
-          </Link>
-          <Link className="card" to="/docs/taubench">
-            <span className="card__kicker">Audit</span>
-            <span className="card__title">τ-bench does not measure its own policy</span>
-            <span className="card__body">
-              Two of its rules written as facts, replayed over 200 trajectories. Both turned
-              out to be ambiguous in ways that reach the gold labels.
-            </span>
-          </Link>
-          <Link className="card" to="/docs/integration/langchain">
-            <span className="card__kicker">Experiment</span>
-            <span className="card__title">The same agent, with and without</span>
-            <span className="card__body">
-              Identical prompt and tools. Haiku 4.5 went 30/45 to 45/45; an earlier Opus 5
-              suite went 19/21 to 21/21. The only difference is the guard.
-            </span>
-          </Link>
-        </div>
+        <Cards items={c.measuredCards} href={href} />
       </section>
 
       <section>
-        <p className="section__label">Use it from Python</p>
-        <h2 className="section__title">The language is the research artifact. This is what ships.</h2>
-        <p className="section__lede">
-          The reason to keep the rules in a policy file rather than writing the checks in
-          Python is the second line below: the rules your guard enforces at three in the
-          morning are the same artifact a solver proved.
-        </p>
+        <p className="section__label">{c.pythonLabel}</p>
+        <h2 className="section__title">{c.pythonTitle}</h2>
+        <p className="section__lede">{c.pythonLede}</p>
 
         <div className="demo">
           <div className="panel">
@@ -254,7 +167,7 @@ export function Home() {
               guard.py
             </div>
             <div className="prose">
-              <PythonApi components={{ ...mdxComponents, pre: 'pre' }} />
+              <PythonApi components={BARE} />
             </div>
           </div>
 
@@ -263,86 +176,47 @@ export function Home() {
               <table>
                 <thead>
                   <tr>
-                    <th>Shape</th>
-                    <th>You change</th>
-                    <th>You get</th>
+                    {c.shapeHead.map((h) => (
+                      <th key={h}>{h}</th>
+                    ))}
                   </tr>
                 </thead>
                 <tbody>
-                  <tr>
-                    <td>observer</td>
-                    <td>nothing, you feed it events</td>
-                    <td>what is true of the record, and an audit</td>
-                  </tr>
-                  <tr>
-                    <td>guard</td>
-                    <td>assertions and tool calls route through it</td>
-                    <td>ungrounded claims raise instead of shipping</td>
-                  </tr>
-                  <tr>
-                    <td>language</td>
-                    <td>
-                      handlers written in <code>.eleph</code>
-                    </td>
-                    <td>the static proof</td>
-                  </tr>
+                  {c.shapes.map((row) => (
+                    <tr key={row[0]}>
+                      <td>{row[0]}</td>
+                      <td>{row[1]}</td>
+                      <td>{row[2]}</td>
+                    </tr>
+                  ))}
                 </tbody>
               </table>
             </div>
             <p style={{ marginTop: '1rem', color: 'var(--fg-muted)' }}>
-              Cheapest first. <code>python examples/agente.py</code> runs all three.{' '}
-              <Link to="/docs/python-api">Read the API reference →</Link>
+              {c.shapesNote} <code>python examples/agente.py</code>.{' '}
+              <Link to={href('/docs/python-api')}>{c.pythonLabel} →</Link>
             </p>
           </div>
         </div>
       </section>
 
       <section>
-        <p className="section__label">Whichever one you are</p>
-        <h2 className="section__title">Three doors, and they are not the same door.</h2>
-        <div className="cards">
-          <Link className="card" to="/docs/use/start-here">
-            <span className="card__kicker">You ship an agent</span>
-            <span className="card__title">Start here</span>
-            <span className="card__body">
-              What it does, what it does not do, and which of the three shapes is yours.
-              GPT-4, Claude, or a hand-written loop: nothing in the guard knows what an LLM
-              is.
-            </span>
-          </Link>
-          <Link className="card" to="/docs/quickstart">
-            <span className="card__kicker">You want to see it</span>
-            <span className="card__title">Quickstart</span>
-            <span className="card__body">
-              Nine lines, one bug McCarthy wrote down in 1998, and a checker that prints
-              the history that breaks it.
-            </span>
-          </Link>
-          <Link className="card" to="/docs/concepts/completeness">
-            <span className="card__kicker">You want the argument</span>
-            <span className="card__title">Proof, not spot check</span>
-            <span className="card__body">
-              The completeness thresholds, the locality lemma, and the experiments that
-              would break each claim.
-            </span>
-          </Link>
-        </div>
+        <p className="section__label">{c.doorsLabel}</p>
+        <h2 className="section__title">{c.doorsTitle}</h2>
+        <Cards items={c.doors} href={href} />
       </section>
 
       <div className="cta">
         <div>
-          <h2>Start with the bug that started it.</h2>
-          <p>
-            Install, derive the obligations of a nine-line program, and watch the checker
-            produce the history that breaks it.
-          </p>
+          <h2>{c.ctaTitle}</h2>
+          <p>{c.ctaBody}</p>
         </div>
         <div className="hero__actions" style={{ marginTop: 0 }}>
-          <Link className="button button--primary" to="/docs/quickstart">
-            Quickstart <IconArrowRight />
+          <Link className="button button--primary" to={href('/docs/quickstart')}>
+            {c.ctaButton} <IconArrowRight />
           </Link>
-          <Link className="button button--ghost" to="/docs/limits">
-            Honest limits
+          <Link className="button button--ghost" to={href('/docs/limits')}>
+            {c.ctaGhost}
           </Link>
         </div>
       </div>

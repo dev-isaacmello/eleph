@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 
+import { useLocale } from '@/lib/locale'
+
 interface Heading {
   id: string
   text: string
@@ -24,6 +26,7 @@ export function Toc({
 }) {
   const [headings, setHeadings] = useState<Heading[]>([])
   const [active, setActive] = useState<string>('')
+  const { t } = useLocale()
 
   useEffect(() => {
     const root = contentKey ? document.getElementById(containerId) : null
@@ -67,7 +70,7 @@ export function Toc({
 
   return (
     <aside className="toc scroll-thin">
-      <h2 className="toc__title">On this page</h2>
+      <h2 className="toc__title">{t.onThisPage}</h2>
       <ul className="toc__list">
         {headings.map((h) => (
           <li key={h.id}>

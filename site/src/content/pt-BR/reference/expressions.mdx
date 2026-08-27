@@ -1,0 +1,152 @@
+---
+title: Expressões temporais
+description: Todo operador que lê o passado — átomos, since_not, count, quantificadores, spoke, campos numéricos — e o que cada um pergunta ao histórico.
+---
+
+# Expressões temporais
+
+<p className="lede">
+Tudo que um programa pode saber é uma fórmula sobre o log dele. Estas são as
+formas que essa fórmula pode assumir.
+</p>
+
+## A tabela
+
+| Forma | Significado |
+|---|---|
+| `e(a, b)` | o evento `e` ocorreu **ao menos uma vez** no passado |
+| `a since_not b` | `a` ocorreu e nenhum `b` ocorreu desde então |
+| `count e(a) >= n` | quantas vezes `e` ocorreu |
+| `exists P: Sort where φ` | algum objeto satisfaz φ agora |
+| `count P: Sort where φ >= n` | quantos satisfazem, que é do que um limite de assentos precisa |
+| `spoke accept to C about e(...)` | o programa executou aquele ato naquela troca |
+| `e(a, amount > 100)` | um campo numérico do evento, testado no momento em que acontece |
+| `not`, `and`, `or` | como de costume |
+
+Parênteses agrupam. `not` liga mais forte, depois `since_not`, depois `and`,
+depois `or`.
+
+## Átomos: a armadilha, de propósito
+
+```eleph
+make_reservation(P, F)
+```
+
+Um átomo de evento sozinho significa *isto aconteceu ao menos uma vez, alguma
+vez*. Lê-se como "tem" e significa "fez". Os dois concordam até o primeiro
+cancelamento e nunca mais depois.
+
+<Callout type="danger" title="Esta é a única armadilha deliberada da linguagem">
+`e(a, b)` sozinho é mantido porque é o erro que sistemas reais cometem. O
+verificador é o que distingue os dois — veja [o bug do
+McCarthy](/docs/the-mccarthy-bug).
+</Callout>
+
+## `since_not`
+
+```eleph
+make_reservation(P, F) since_not cancel_reservation(P, F)
+```
+
+Exatamente: *existe um `a` depois do último `b`*. É o operador que faz um fato se
+comportar como um campo mutável sem ser um.
+
+```eleph
+fact active(U: User) := subscribed(U) since_not cancelled(U)
+fact flight_open(F: Flight) := not close_flight(F)
+```
+
+Seus operandos serem **átomos** é a hipótese do [limiar de completude
+linear](/docs/concepts/completeness). Uma expressão composta sob `since_not` ainda
+verifica, só que no limite do espaço de estados do monitor.
+
+## `count` sobre ocorrências
+
+```eleph
+count make_reservation(P, F) >= 8
+```
+
+Quantas vezes o átomo ocorreu. Qualquer um de `>=`, `<=`, `==`, `!=`, `<`, `>`
+contra um inteiro não negativo.
+
+A constante importa para o custo: provar algo sobre uma capacidade de 180 precisa
+de históricos que caibam 180 eventos.
+
+## Quantificadores
+
+```eleph
+exists P: Passenger where has_reservation(P, F)
+
+fact seats_left(F: Flight) := count P: Passenger where has_reservation(P, F) < 2
+```
+
+`exists` pergunta se **algum** objeto daquele sort satisfaz o corpo agora. `count
+… where` pergunta quantos satisfazem, que é do que um limite de capacidade
+precisa — este é o exemplo do próprio McCarthy, e não é expressável sem
+quantificação.
+
+O verificador limita o domínio: um objeto sem nenhuma ocorrência no histórico
+falsifica todo átomo que o nomeia, então quantificar sobre os objetos que aparecem
+é o mesmo que quantificar sobre um universo ilimitado.
+
+## `spoke`
+
+```eleph
+if spoke accept to C about make_reservation(P, F):
+    decline C
+```
+
+As falas do programa são eventos no mesmo log, então dá para perguntar o que ele
+já disse. Os performativos registráveis são:
+
+`answer` · `accept` · `decline` · `promise` · `ask`
+
+<Callout type="limit">
+`spoke` nomeia a **troca e o ato**, não o conteúdo proposicional. *"Já prometi
+exatamente isto?"* não é expressável. *"Já prometi alguma coisa aqui?"* é.
+</Callout>
+
+## Campos numéricos
+
+```eleph
+event charged_while_active(u: User, c: Charge, amount: Number)
+
+fact refundable(U: User, C: Charge) :=
+    charged_after_cancelling(U, C, amount > 0) since_not refunded(U, C)
+
+fact within_limit(U: User, C: Charge) :=
+    charged_after_cancelling(U, C, amount <= 200) since_not refunded(U, C)
+```
+
+Uma comparação numa posição de argumento restringe um campo numérico do evento. A
+comparação é **parte da identidade do átomo** em vez de um fato separado que
+poderia se mover por baixo, que é o que mantém o argumento de completude intacto.
+
+<Callout type="limit" title="Comparados no instante em que o evento acontece">
+Você pode perguntar se *esta cobrança* passou de 100. Não pode perguntar se a soma
+das últimas três passou. Aritmética agregada sobre o histórico não é expressável.
+</Callout>
+
+## Booleanos
+
+```eleph
+not close_flight(F)
+has_reservation(P, F) and flight_open(F)
+refundable(U, C) and not within_limit(U, C)
+```
+
+`yes` e `no` também são literais dentro de uma expressão, então `answer C with
+yes` parseia e significa a constante.
+
+## Fatos compõem
+
+Um fato pode referenciar qualquer outro fato, e essa é a forma pretendida de
+construir uma política:
+
+```eleph
+fact may_refund(U: User, C: Charge)        := refundable(U, C) and within_limit(U, C)
+fact needs_escalation(U: User, C: Charge)  := refundable(U, C) and not within_limit(U, C)
+```
+
+Os dois são provados para todo histórico em
+<Source file="examples/langchain-agent/policy.eleph" />.

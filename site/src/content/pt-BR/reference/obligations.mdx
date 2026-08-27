@@ -1,0 +1,99 @@
+---
+title: Obrigações derivadas
+description: As dez condições de correção, o que cada uma exige, e quais são descarregadas pelo Z3 versus estruturalmente.
+---
+
+# Obrigações derivadas
+
+<p className="lede">
+Uma tabela de referência do que o compilador lê de um programa. Para o raciocínio
+por trás delas, veja a <a href="/docs/concepts/obligations">página de conceito</a>.
+</p>
+
+## As dez
+
+| Obrigação | Exige | Checada por |
+|---|---|---|
+| a resposta é verdadeira | neste caminho, a resposta dada é implicada pelo log | Z3, no limiar de completude |
+| a resposta responde à pergunta feita | a resposta é sobre o assunto da pergunta | Z3 |
+| promessa imediata vale quando feita | φ é verdadeiro sobre o log mais o que este handler registrou | Z3 |
+| promessa futura é cumprível | algum caminho torna φ de falsa em verdadeira | Z3 |
+| oferta é honrável | algum caminho poderia realizar φ | Z3 |
+| tipos batem com as declarações | todo argumento ocupa uma posição do próprio sort | compilador, em todo fato, usado ou não |
+| nenhuma porta destrancada | nenhum handler sobre assunto protegido sem o portão que o vizinho tem | estrutural |
+| exatamente uma resposta por caminho | todo caminho por um `question` responde uma vez | estrutural |
+| exatamente uma réplica por caminho | todo caminho por um `request` aceita ou recusa uma vez | estrutural |
+| compromissos quitados | nada em aberto é silenciosamente esquecido | livro em runtime |
+
+## Como cada uma é impressa
+
+Rode `eleph obligations` para ver as condições sem descarregá-las:
+
+```out
+$ eleph obligations examples/booking.eleph
+
+  linha 23  request(Caller, make_reservation)
+    a promessa esta cumprida ao ser feita
+      supondo   nao (make_reservation(P, F) e desde entao nenhum cancel_reservation(P, F))
+      entao     (make_reservation(P, F) e desde entao nenhum cancel_reservation(P, F))
+
+  linha 29  request(Caller, cancel_reservation)
+    a promessa esta cumprida ao ser feita
+      supondo   (make_reservation(P, F) e desde entao nenhum cancel_reservation(P, F))
+      entao     nao (make_reservation(P, F) e desde entao nenhum cancel_reservation(P, F))
+```
+
+| Linha | O que é |
+|---|---|
+| `linha N  handler` | onde no fonte esta obrigação nasceu |
+| o título | qual das dez é esta |
+| `supondo` | a condição de caminho: o ramo tomado até o comando |
+| `entao` | o objetivo: o que executar o ato afirma |
+
+## Polaridade
+
+A maioria das obrigações é **universal**: nenhum histórico pode tornar as
+suposições verdadeiras e o objetivo falso. Duas são **existenciais** — a
+cumpribilidade de uma promessa futura e a honrabilidade de uma oferta — onde o que
+tem que existir é um caminho:
+
+```out
+  ok  request(C, make_reservation)  linha 46  -  a promessa pode vir a ser cumprida (antes de board(P, F))
+      cumprivel por: request assign_seat > entao l51
+```
+
+Quando uma obrigação existencial falha, o verificador diz isso nesses termos em vez
+de imprimir um histórico:
+
+```out
+      nenhum caminho do programa chega a cumprir isso
+```
+
+## Vereditos
+
+| Marcador | Significado |
+|---|---|
+| `ok` | descarregada no limiar de completude desta obrigação |
+| `ok?` | sobreviveu ao limite dado, que estava abaixo do limiar |
+| `X` | existe um contraexemplo, e ele é impresso |
+| `PROVADO` | toda obrigação vale para todo histórico, de qualquer tamanho |
+| `SEM CONTRAEXEMPLO` | nada quebrou dentro de limites que não foram exaustivos |
+| `REPROVADO` | ao menos uma obrigação não é cumprida |
+
+## A alegação de solidez que liga isso ao runtime
+
+> **Se toda obrigação é provada, o runtime nunca recusa.**
+
+O runtime recusa exatamente quando a condição de verdade de um ato de fala falha, e
+o derivador emite *condição de caminho implica condição de verdade* para cada ato
+desses sobre o mesmo log. A alegação é testada martelando programas provados com
+passados aleatórios e conversas aleatórias, e confirmando que os não provados **de
+fato** recusam.
+
+Ela vive em <Source file="tests/test_soundness.py" />.
+
+## Fonte
+
+Derivação: <Source file="eleph/obligations.py" />. Descarga:
+<Source file="eleph/verify.py" />. Limiares:
+<Source file="eleph/threshold.py" />.

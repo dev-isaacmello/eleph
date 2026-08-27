@@ -1,0 +1,92 @@
+---
+title: O passado é o único estado
+description: Não existe atribuição na gramática do eleph. Um fato não é armazenado, ele é uma consulta sobre o que aconteceu.
+---
+
+# O passado é o único estado
+
+<p className="lede">
+Não existe atribuição na gramática. Isso não é uma omissão. Não há a que
+atribuir, porque um fato não é armazenado — ele é uma consulta sobre o que
+aconteceu.
+</p>
+
+## Um fato é uma fórmula
+
+```eleph
+fact has_reservation(P: Passenger, F: Flight) :=
+    make_reservation(P, F) since_not cancel_reservation(P, F)
+```
+
+`has_reservation` não é uma coluna, um cache, nem um campo de objeto. É a frase
+*"existe um `make_reservation` depois do último `cancel_reservation`"*, avaliada
+contra o log toda vez que alguém pergunta.
+
+Nada é sobrescrito, então nada pode sair de acordo com a verdade. A falha clássica
+— uma flag booleana que alguém esqueceu de limpar — não tem formato que pudesse
+assumir aqui.
+
+## Tudo que o programa diz também é evento
+
+As falas do programa vão para o mesmo log que os eventos do mundo, então dá para
+perguntar a ele o que já disse:
+
+```eleph
+if spoke accept to C about make_reservation(P, F):
+    decline C
+```
+
+É por isso que os contraexemplos que o `eleph check` imprime incluem linhas como
+`disse-ask-sobre-has_reservation(Caller, P, F)`. Uma pergunta foi feita, então o
+perguntar aconteceu, então está no histórico.
+
+`spoke` nomeia a troca e o ato, não o conteúdo proposicional — veja [os
+limites](/docs/limits) para exatamente o que isso permite e não permite perguntar.
+
+## O que substitui o que você abriu mão
+
+| Você escreveria | Você escreve em vez disso |
+|---|---|
+| `user.active = False` | `record cancelled(u)` |
+| `if user.active:` | `if subscribed(U) since_not cancelled(U):` |
+| uma tabela `reservations` | `count P: Passenger where has_reservation(P, F)` |
+| uma coluna `promised_at` | `promise C that φ before e(...)`, e leia o livro |
+| um log de auditoria ao lado do estado | só existe o log; o estado é derivado |
+
+A última linha é a que muda como se argumenta sobre um sistema. Num projeto
+comum, o log de auditoria é um segundo artefato que deveria concordar com o
+primeiro. Aqui não existe primeiro.
+
+## Durabilidade sai de graça
+
+Nada além de eventos é escrito em disco. O índice e o livro de compromissos são
+reconstruídos revivendo o passado, então um processo que morreu e voltou é
+indistinguível de um que nunca morreu.
+
+```python
+g = policy.guard(log="booking.jsonl")   # reabrir reexecuta
+```
+
+Uma última linha truncada é descartada: um evento que nunca terminou de ser
+escrito é um evento que não aconteceu.
+
+## A objeção, e a resposta
+
+Se o único estado é o passado, responder uma pergunta significa ler o passado, o
+que é quadrático. E apareceu: com quatro mil interações, uma versão inicial
+rodava a 46 eventos por segundo.
+
+A resposta é que todo operador aqui tem uma recorrência de um passo, e um lema
+deixa isso afiado — *um evento que não casa com nenhum átomo de uma subfórmula não
+pode mudar o valor dela*. Dobrar um evento para dentro toca só as chaves que esse
+evento nomeia.
+
+Medido em 145.564 eventos em 6,1 s com throughput constante. O argumento completo
+e os números estão na [página de desempenho](/docs/performance).
+
+<Callout type="proved" title="A otimização nunca é confiada">
+Cada célula do índice é uma função pura do log — a mesma função que o avaliador
+ingênuo calcula relendo. Isso é uma otimização de uma alegação de verdade, então
+`Machine(audit=True)` responde toda consulta **pelos dois caminhos** e levanta
+erro se discordarem.
+</Callout>

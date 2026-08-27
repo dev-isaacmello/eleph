@@ -1,0 +1,161 @@
+---
+title: Instalação
+description: Instale o eleph do PyPI ou do código-fonte. Requer Python 3.11 ou mais novo e o Z3.
+---
+
+# Instalação
+
+<p className="lede">
+O eleph é um pacote Python com uma única dependência de runtime: o provador de
+teoremas Z3, que é o que descarrega as obrigações.
+</p>
+
+## Requisitos
+
+| | |
+|---|---|
+| Python | 3.11, 3.12 ou 3.13 |
+| Dependência | `z3-solver >= 4.12` |
+| Licença | MIT |
+
+Python 3.11 é o piso e é testado no CI a cada push, junto com 3.12 e 3.13.
+
+## Dentro de um projeto
+
+```bash
+uv add eleph          # ou:  pip install eleph
+```
+
+Isso instala o pacote importável e o comando `eleph`.
+
+<Callout type="danger" title="uv add não coloca o eleph no seu PATH">
+`uv add` instala no `.venv` do projeto, então o executável vai parar em
+`.venv/bin/eleph` e o shell não vai achar:
+
+```bash
+$ eleph check policy.eleph
+zsh: command not found: eleph
+```
+
+Alcance pelo ambiente que tem:
+
+```bash
+uv run eleph check policy.eleph     # sem precisar ativar nada
+```
+
+ou ative o ambiente antes:
+
+```bash
+source .venv/bin/activate
+eleph check policy.eleph
+```
+</Callout>
+
+## Como comando, em qualquer lugar
+
+Se o que você quer é o CLI e não uma biblioteca num projeto, instale como
+ferramenta. Ele ganha um ambiente isolado próprio e vai para o seu PATH:
+
+```bash
+uv tool install eleph
+```
+
+```bash
+$ command -v eleph
+~/.local/bin/eleph
+```
+
+`uv tool uninstall eleph` remove. Com pip, o equivalente é o
+[`pipx`](https://pipx.pypa.io/): `pipx install eleph`.
+
+## Extras opcionais
+
+Existem dois extras, e nenhum é necessário para a linguagem ou o verificador.
+
+| Extra | Adiciona | Necessário para |
+|---|---|---|
+| `claude` | `anthropic >= 0.40` | o front end de linguagem natural usado por `eleph talk --claude` |
+| `langchain` | `langchain`, `langchain-anthropic`, `langgraph` (todos `>= 1.0`) | a comparação de agentes em `examples/langchain-agent` |
+
+```bash
+uv pip install "eleph[claude]"
+uv pip install "eleph[langchain]"
+```
+
+## Confira se funcionou
+
+Escreva um arquivo. Nove linhas bastam para ter algo provado:
+
+```bash
+cat > airline.eleph <<'EOF'
+program airline
+
+event make_reservation(passenger, flight)
+event cancel_reservation(passenger, flight)
+
+fact has_reservation(P, F) := make_reservation(P, F) since_not cancel_reservation(P, F)
+
+on question(Caller, has_reservation(P, F)):
+    answer Caller with has_reservation(P, F)
+EOF
+
+eleph check airline.eleph
+```
+
+Se a instalação está boa, o Z3 descarregou a obrigação e você vai ver:
+
+```out
+airline.eleph  ->  programa airline
+2 eventos, 1 fato, 1 handler
+
+1 obrigacao derivada do texto do programa
+cada uma checada no seu limiar de completude (o maior: 3 eventos) -- exaustivo
+
+  ok  question(Caller, has_reservation)  linha 9  -  a resposta responde a pergunta feita
+
+PROVADO  -  1 obrigacao vale para TODO historico, de qualquer tamanho
+```
+
+<Callout type="danger" title="Os exemplos não estão no pacote">
+Nada em `examples/` ou `bench/` é instalado por `pip install` ou `uv add`. Só o
+pacote `eleph` é:
+
+```bash
+$ find .venv -name "*.eleph"
+$                                   # nada
+```
+
+Então `eleph check examples/airline.eleph` depois de instalar do PyPI falha, e
+hoje falha com um traceback do Python em vez de uma mensagem. **Toda página
+deste site que cita um caminho dentro de `examples/` assume que você clonou o
+repositório.**
+</Callout>
+
+## Para os exemplos, clone o repositório
+
+Os primeiros passos, as páginas de conceito e a referência do CLI citam execuções
+sobre arquivos do repositório. Para reproduzi-las:
+
+```bash
+git clone https://github.com/dev-isaacmello/eleph && cd eleph
+uv venv && uv pip install -e ".[dev]"
+source .venv/bin/activate
+
+eleph check examples/airline.eleph
+```
+
+```out
+examples/airline.eleph  ->  programa airline
+3 eventos, 1 fato, 1 handler
+
+2 obrigacoes derivadas do texto do programa
+cada uma checada no seu limiar de completude (o maior: 3 eventos) -- exaustivo
+
+  ok  question(Caller, has_reservation)  linha 16  -  resposta yes e verdadeira
+  ok  question(Caller, has_reservation)  linha 18  -  resposta no e verdadeira
+
+PROVADO  -  2 obrigacoes valem para TODO historico, de qualquer tamanho
+```
+
+A auditoria do τ-bench baixa cerca de 6 MB de trajetórias publicadas no primeiro
+uso, e pula limpo sem rede.

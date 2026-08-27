@@ -1,0 +1,210 @@
+---
+title: Modelando seu domínio
+description: Transformar as tabelas que você já tem em eventos e fatos, e escolher o que guardar primeiro.
+---
+
+# Modelando seu domínio
+
+<p className="lede">
+Este é o único pensamento genuinamente novo em adotar o eleph. Todo o resto são
+quatro chamadas de método. Aqui você pega as tabelas que já tem e faz outra
+pergunta a elas: não <em>qual é o estado</em>, mas <em>o que aconteceu</em>.
+</p>
+
+## A tradução
+
+Seu banco tem uma linha por cliente com colunas nela. O eleph não tem colunas. Um
+fato é uma pergunta feita ao histórico, toda vez.
+
+| Você tem | Você registra | Você pergunta |
+|---|---|---|
+| `users.active` (booleano) | `subscribed(u)`, `cancelled(u)` | `active(U) := subscribed(U) since_not cancelled(U)` |
+| `charges.refunded_at` (anulável) | `refunded(u, c)` | `refunded(U, C) since_not charged(U, C)` |
+| `sessions.user_id` | `authenticated(who, u)`, `logged_out(who, u)` | `authorised(Q, U) := authenticated(Q, U) since_not logged_out(Q, U)` |
+| `reservations` (uma tabela) | `make_reservation(p, f)`, `cancel_reservation(p, f)` | `count P: Passenger where has_reservation(P, F) < 2` |
+| um `audit_log` ao lado do estado | nada a mais | só existe o log; o estado é derivado |
+
+A última linha é a que muda como se argumenta sobre um sistema. Num projeto
+comum, o log de auditoria é um segundo artefato que deveria concordar com o
+primeiro. Aqui não existe primeiro.
+
+## A única regra para eventos
+
+<Callout type="proved" title="Um evento é algo que aconteceu, e nunca desacontece">
+Nunca registre um *estado*. Registre a *transição*. `set_active(u, false)` é uma
+coluna com passos a mais; `cancelled(u)` é um evento.
+
+Se você se pegar querendo registrar o mesmo evento duas vezes para dizer "ainda
+vale", você modelou um estado. Volte um passo e ache a coisa que mudou.
+</Callout>
+
+## Ponha no evento o que o evento decide
+
+Esta é a armadilha que custou duas execuções ao exemplo, e vale a página inteira.
+
+A primeira versão da regra de reembolso dizia *"reembolsável = uma cobrança em
+aberto, e o cliente não está ativo"*:
+
+```eleph
+fact refundable(U, C) := charged(U, C) and not active(U)
+```
+
+Cancelar é permitido para um cliente ativo. Então:
+
+```python
+guard.require("refundable", "ana", "c1")   # Ungrounded, corretamente
+
+guard.require("active", "ana")             # permitido
+guard.record("cancelled", "ana")
+
+guard.require("refundable", "ana", "c1")   # agora passa
+```
+
+**Duas ações permitidas se compõem num resultado proibido.** Cancele hoje, e uma
+cobrança de três meses atrás vira reembolsável. O modelo chegou lá sozinho, de vez
+em quando, lendo "cancelei mês passado" como um pedido de cancelamento.
+
+As duas versões foram provadas para todo histórico, antes e depois.
+
+<Callout type="danger" title="Uma prova diz que cada obrigação vale. Ela não diz que a política é a que você queria.">
+Escrever a regra não te entrega a regra certa. Te entrega uma regra que você pode
+interrogar, e interrogá-la foi o que trouxe isso à tona. Sem isso, o buraco teria
+ido para produção com a palavra `PROVADO` ao lado, que é a pior combinação
+disponível.
+</Callout>
+
+A correção é o padrão para qualquer coisa que a linguagem não consegue resolver
+sozinha: **o que torna uma cobrança reembolsável é quando ela caiu**, não o estado
+da conta no momento em que alguém pergunta. Então a cobrança carrega isso na
+própria identidade:
+
+```eleph
+event charged_while_active(u: User, c: Charge, amount: Number)
+event charged_after_cancelling(u: User, c: Charge, amount: Number)
+
+fact refundable(U: User, C: Charge) :=
+    charged_after_cancelling(U, C, amount > 0) since_not refunded(U, C)
+```
+
+Dois eventos em vez de um, e a composição some.
+
+## Tempo
+
+<Callout type="limit" title="Não existe relógio de parede">
+`since_not` sabe **ordem**, não tempo. *"Reembolsar em até 24 horas da cobrança"*
+não é expressável diretamente.
+
+O padrão que funciona, e o que a auditoria do τ-bench usa, é o seu sistema emitir
+o prazo como um evento:
+
+```python
+guard.record("charged_after_cancelling", user, charge, amount)
+guard.promise(user, "refunded", user, charge,
+              before=("refund_window_closed", (user, charge)))
+
+# ... seu agendador, 24 horas depois
+guard.record("refund_window_closed", user, charge)
+```
+
+O relógio vive fora da lógica, que é como sistemas orientados a eventos lidam com
+tempo de qualquer forma.
+</Callout>
+
+## Dinheiro e quantidades
+
+Uma comparação numa posição de argumento restringe um campo numérico, **no
+instante em que o evento acontece**:
+
+```eleph
+fact within_limit(U: User, C: Charge) :=
+    charged_after_cancelling(U, C, amount <= 200) since_not refunded(U, C)
+```
+
+É isso que mantém o [argumento de completude](/docs/concepts/completeness)
+intacto, e também é o limite: você pode perguntar se *esta cobrança* passou de
+200, não se a soma das últimas três passou. **Aritmética agregada sobre o
+histórico não é expressável.** Se você precisa de um acumulado, calcule no seu
+sistema e emita a conclusão como evento.
+
+## Quem pode perguntar
+
+A falha que custou 0/5 na comparação não foi uma mentira. O agente informou a
+conta de um estranho com toda honestidade. Todas as outras obrigações passaram
+naquela execução.
+
+```eleph
+fact authorised(Q: Party, U: User) := authenticated(Q, U) since_not logged_out(Q, U)
+
+on question(Who, active(U)) permitted authorised(Who, U):
+    answer Who with active(U)
+```
+
+Modele autoridade como um fato sobre o log, como todo o resto. Veja
+[permissão](/docs/concepts/permission), incluindo o que ela deliberadamente não
+é: não há papéis, nem hierarquia, nem delegação.
+
+## Por onde começar, concretamente
+
+<Steps>
+<li>
+**Escolha a ferramenta que sairia mais caro errar.** Dinheiro saindo, dado
+divulgado, algo irreversível. Não a mais frequente.
+</li>
+<li>
+**Escreva a frase que seu time já diz sobre ela.** *"Só reembolsamos cobrança que
+caiu depois do cancelamento, ainda não devolvida, e abaixo de R$ 200."* Se
+ninguém consegue dizer essa frase, esse é o seu achado, e vale mais que a
+integração.
+</li>
+<li>
+**Transforme cada cláusula num evento ou num fato.** Três cláusulas, três fatos. A
+tabela no topo desta página é a tradução inteira.
+</li>
+<li>
+**Rode `eleph check`.** Se não provar, a regra se contradiz e você aprendeu algo
+antes de escrever qualquer Python.
+</li>
+<li>
+**Rode como observador sobre o tráfego de ontem.** Registre o que aconteceu,
+pergunte aos fatos o que era verdade, e veja se ele alguma vez discorda do que
+seu agente fez. Ele não aplica nada, então não pode quebrar nada.
+</li>
+<li>
+**Aí ligue o `require` para aquela ferramenta.** Adicione a próxima quando a
+primeira estiver entediante.
+</li>
+</Steps>
+
+## Lendo a prova
+
+```out
+$ eleph check support.eleph
+
+8 eventos, 5 fatos, 2 handlers
+
+2 obrigacoes derivadas do texto do programa
+cada uma checada no seu limiar de completude (o maior: 6 eventos) -- exaustivo
+
+PROVADO  -  2 obrigacoes valem para TODO historico, de qualquer tamanho
+```
+
+`PROVADO` significa que toda obrigação vale para **todo** histórico, de qualquer
+tamanho, não só os que você pensou em testar. Se aparecer `SEM CONTRAEXEMPLO`, a
+execução não foi exaustiva e a ferramenta está te dizendo isso. A diferença está
+em [prova, não amostragem](/docs/concepts/completeness).
+
+## Próximo
+
+<Steps>
+<li>
+[**API Python**](/docs/python-api) — cada método e exceção.
+</li>
+<li>
+[**Expressões temporais**](/docs/reference/expressions) — para quando
+`since_not` e `count` não bastam.
+</li>
+<li>
+[**Limites honestos**](/docs/limits) — verificados, e vale ler antes de se
+comprometer com isso.
+</li>
+</Steps>

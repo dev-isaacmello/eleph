@@ -22,13 +22,15 @@ function normalise(s: string) {
  * Small enough to score every record on every keystroke, which is why there is
  * no index structure here. Twenty pages is not a search problem.
  */
-export function search(query: string, limit = 8): Record[] {
+export function search(query: string, locale: string, limit = 8): Record[] {
   const terms = normalise(query).split(/\s+/).filter(Boolean)
   if (!terms.length) return []
 
   const scored: { record: Record; score: number }[] = []
 
   for (const record of records) {
+    if (record.locale !== locale) continue
+
     const title = normalise(record.title)
     const page = normalise(record.page)
     const body = normalise(record.description)

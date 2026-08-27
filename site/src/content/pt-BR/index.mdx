@@ -1,0 +1,104 @@
+---
+title: O que é o eleph
+description: Uma linguagem cujos programas não conseguem mentir — atos de fala, um histórico que é o único estado, e condições de correção derivadas do texto do programa.
+---
+
+# O que é o eleph
+
+<p className="lede">
+O eleph é uma linguagem de programação para a parte do sistema que fala. Ela tem
+atos de fala no lugar de comandos de impressão, um histórico no lugar de
+variáveis, e condições de correção que são lidas do programa em vez de escritas
+ao lado dele.
+</p>
+
+Ela implementa e estende o **Elephant 2000**, uma linguagem especificada por John
+McCarthy em Stanford, em 6 de novembro de 1998, e nunca implementada por ele. O
+projeto é dele. Os limiares de completude, as obrigações de compromisso, o
+runtime incremental e a API embutível são deste projeto.
+
+## O problema para o qual ela foi construída
+
+Um agente afirma coisas sobre o registro de um cliente, e promete fazer coisas.
+Hoje nada liga nenhum dos dois à realidade. Filtros de saída conferem o texto.
+Nada confere se uma afirmação decorre do que de fato aconteceu, e nada acompanha
+se uma promessa chegou a ser cumprida.
+
+A resposta de McCarthy, escrita antes de o problema existir: faça o programa
+dizer apenas o que o próprio histórico dele sustenta, e faça das promessas
+dívidas que ele tem que quitar. Duas obrigações, ambas dele:
+
+* **Uma resposta tem que ser verdadeira.** Todo `yes` ou `no` tem que ser
+  implicado pelo log.
+* **Uma promessa tem que ser cumprida.** O programa não pode prometer o que o
+  histórico dele não estabelece, nem prometer o que nenhum caminho por ele
+  jamais conseguiria realizar.
+
+Você não escreve essas condições. O compilador as lê do programa.
+
+```out
+$ eleph obligations examples/airline_buggy.eleph
+
+  linha 17  question(Caller, has_reservation)
+    resposta yes e verdadeira
+      supondo   alguma vez make_reservation(P, F)
+      entao     (make_reservation(P, F) e desde entao nenhum cancel_reservation(P, F))
+```
+
+Depois ele tenta quebrá-las.
+
+<Callout type="note" title="O CLI fala português">
+O `eleph` imprime em português. Esse é o idioma do autor e a saída faz parte do
+artefato, então este site a cita literalmente. Todo bloco de terminal aqui é uma
+execução real.
+</Callout>
+
+## O que ele não é
+
+Não é uma técnica de prompt, um filtro de saída, nem um motor de políticas que
+se configura. É uma linguagem pequena com um verificador, mais uma biblioteca
+que você pode colocar embaixo de um sistema Python existente sem adotar a
+linguagem em nada.
+
+Também não está pronto. A página de [limites honestos](/docs/limits) é
+verificada e não é hedge de marketing: não existe relógio de parede, agregados
+sobre o histórico não são expressáveis, fatos não podem ser recursivos, e os
+dois teoremas são provados no papel e testados, não mecanizados.
+
+## Para onde ir
+
+<Callout type="note" title="Se você já tem um agente em produção">
+Pule esta seção. [Comece por aqui](/docs/use/start-here) foi escrito para você:
+o que a guarda faz, o que ela não faz (não vai reduzir sua conta de token), e
+qual das três formas de integração é a sua. Duas das três não precisam de nada
+da linguagem abaixo.
+</Callout>
+
+<Steps>
+<li>
+**[Instalar](/docs/installation)** — um `pip install`, uma dependência (Z3).
+</li>
+<li>
+**[Primeiros passos](/docs/quickstart)** — derive as obrigações de um programa
+de nove linhas e veja o verificador produzir um histórico que as quebra.
+</li>
+<li>
+**[O bug do McCarthy](/docs/the-mccarthy-bug)** — a diferença de uma palavra que
+a linguagem inteira existe para expor.
+</li>
+<li>
+**[Embutir](/docs/python-api)** — três formas de integração, da mais barata para
+a mais cara, sem exigir adoção da linguagem nas duas primeiras.
+</li>
+</Steps>
+
+## Como esta documentação está organizada
+
+| Seção | O que responde |
+|---|---|
+| [Use no seu agente](/docs/use/start-here) | Você já roda um agente e quer a guarda embaixo dele, sem adotar a linguagem |
+| [Conceitos](/docs/concepts/past-is-state) | Por que a linguagem tem esse formato, e o que cada garantia de fato diz |
+| [Referência da linguagem](/docs/reference/program-structure) | Cada forma da gramática, e o que cada uma significa |
+| [Ferramentas](/docs/cli) | Os cinco comandos, e a API Python |
+| [Na prática](/docs/integration/langchain) | Os experimentos medidos: comparação de agentes, throughput, auditoria de benchmark |
+| [Projeto](/docs/limits) | Limites, changelog, e como contribuir |
