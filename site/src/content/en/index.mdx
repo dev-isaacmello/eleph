@@ -1,0 +1,94 @@
+---
+title: What eleph is
+description: A language whose programs cannot lie — speech acts, a history that is the only state, and correctness conditions derived from the program text.
+---
+
+# What eleph is
+
+<p className="lede">
+eleph is a programming language for the part of a system that speaks. It has
+speech acts instead of print statements, a history instead of variables, and
+correctness conditions that are read off the program rather than written beside
+it.
+</p>
+
+It implements and extends **Elephant 2000**, a language specified by John
+McCarthy at Stanford on 6 November 1998 and never implemented by him. The
+design is his. The completeness thresholds, the commitment obligations, the
+incremental runtime and the embeddable API are this project's.
+
+## The problem it was built for
+
+An agent asserts things about a customer's record, and it promises to do
+things. Today nothing connects either to reality. Output filters check the
+text. Nothing checks whether an assertion follows from what actually happened,
+and nothing tracks whether a promise was ever kept.
+
+McCarthy's answer, written before the problem existed: make the program say
+only what its own history supports, and make its promises debts it has to
+settle. Two obligations, both his:
+
+* **An answer must be true.** Every `yes` or `no` must be entailed by the log.
+* **A promise must be kept.** The program cannot promise what its history does
+  not establish, nor promise what no path through it could ever bring about.
+
+You do not write these conditions. The compiler reads them off the program.
+
+```out
+$ eleph obligations examples/airline_buggy.eleph
+
+  linha 17  question(Caller, has_reservation)
+    resposta yes e verdadeira
+      supondo   alguma vez make_reservation(P, F)
+      entao     (make_reservation(P, F) e desde entao nenhum cancel_reservation(P, F))
+```
+
+Then it tries to break them.
+
+<Callout type="note" title="The CLI speaks Portuguese">
+`eleph` prints in Portuguese. That is the author's language and the output is
+part of the artifact, so this site quotes it verbatim rather than translating
+it into something you could not reproduce. Every terminal block on this site is
+a real run.
+</Callout>
+
+## What it is not
+
+It is not a prompt technique, an output filter, or a policy engine you
+configure. It is a small language with a verifier, plus a library you can put
+under an existing Python system without adopting the language at all.
+
+It is also not finished. The [honest limits](/docs/limits) page is verified and
+not hedging: there is no wall clock, aggregates over the history are not
+expressible, facts cannot be recursive, and the two theorems are proved on
+paper and tested rather than mechanised.
+
+## Where to go next
+
+<Steps>
+<li>
+**[Install it](/docs/installation)** — one `pip install`, one dependency (Z3).
+</li>
+<li>
+**[Run the quickstart](/docs/quickstart)** — derive the obligations of a
+nine-line program, then watch the checker produce a history that breaks it.
+</li>
+<li>
+**[Read McCarthy's bug](/docs/the-mccarthy-bug)** — the one-word difference the
+whole language exists to expose.
+</li>
+<li>
+**[Embed it](/docs/python-api)** — three integration shapes, cheapest first,
+with no language adoption required for the first two.
+</li>
+</Steps>
+
+## How this documentation is organised
+
+| Section | What it answers |
+|---|---|
+| [Concepts](/docs/concepts/past-is-state) | Why the language is shaped this way, and what each guarantee actually says |
+| [Language reference](/docs/reference/program-structure) | Every form in the grammar, and what each one means |
+| [Tooling](/docs/cli) | The five commands, and the Python API |
+| [In practice](/docs/integration/langchain) | The measured experiments: an agent comparison, throughput, a benchmark audit |
+| [Project](/docs/limits) | Limits, changelog, and how to contribute |

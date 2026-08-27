@@ -1,0 +1,91 @@
+---
+title: Installation
+description: Install eleph from PyPI or from source. Requires Python 3.11 or newer and Z3.
+---
+
+# Installation
+
+<p className="lede">
+eleph is a Python package with a single runtime dependency: the Z3 theorem
+prover, which is what discharges the obligations.
+</p>
+
+## Requirements
+
+| | |
+|---|---|
+| Python | 3.11, 3.12 or 3.13 |
+| Dependency | `z3-solver >= 4.12` |
+| Licence | MIT |
+
+Python 3.11 is the floor and is tested in CI on every push, alongside 3.12 and
+3.13.
+
+## From PyPI
+
+```bash
+pip install eleph
+```
+
+Or with `uv`, which is what the project itself uses:
+
+```bash
+uv pip install eleph
+```
+
+That installs the `eleph` command and the importable package.
+
+## From source
+
+```bash
+git clone https://github.com/dev-isaacmello/eleph && cd eleph
+uv venv && uv pip install -e ".[dev]"
+```
+
+The `dev` extra adds `pytest`. Run the suite to confirm the install:
+
+```bash
+pytest -q          # 146 tests
+```
+
+## Optional extras
+
+Two extras exist, and neither is needed for the language or the verifier.
+
+| Extra | Adds | Needed for |
+|---|---|---|
+| `claude` | `anthropic >= 0.40` | the natural language front end used by `eleph talk --claude` |
+| `langchain` | `langchain`, `langchain-anthropic`, `langgraph` (all `>= 1.0`) | the worked agent comparison in `examples/langchain-agent` |
+
+```bash
+uv pip install "eleph[claude]"
+uv pip install "eleph[langchain]"
+```
+
+## Check that it works
+
+```bash
+eleph check examples/airline.eleph
+```
+
+If the install is good you will see the program proved:
+
+```out
+examples/airline.eleph  ->  programa airline
+3 eventos, 1 fato, 1 handler
+
+2 obrigacoes derivadas do texto do programa
+cada uma checada no seu limiar de completude (o maior: 3 eventos) -- exaustivo
+
+  ok  question(Caller, has_reservation)  linha 16  -  resposta yes e verdadeira
+  ok  question(Caller, has_reservation)  linha 18  -  resposta no e verdadeira
+
+PROVADO  -  2 obrigacoes valem para TODO historico, de qualquer tamanho
+```
+
+<Callout type="note" title="Running the examples">
+The `examples/` and `bench/` directories ship in the source distribution but
+are not installed onto your path. To run them, clone the repository. The
+τ-bench audit additionally downloads about 6 MB of published trajectories on
+first use, and skips cleanly with no network.
+</Callout>

@@ -1,0 +1,140 @@
+---
+title: Proof, not spot check
+description: A computable completeness threshold turns "no counterexample up to N" into "no counterexample exists".
+---
+
+# Proof, not spot check
+
+<p className="lede">
+Bounded model checking answers a weaker question than we want: no history <em>up
+to length N</em> breaks the obligation. For this language's fragment that gap
+closes, because a computable threshold makes "no counterexample found" mean
+"none exists".
+</p>
+
+## Why a fixed bound is not enough
+
+`examples/fundo.eleph` claims elite status at seven bookings when the fact
+requires eight. A bound of six approves it:
+
+```out
+$ eleph check examples/fundo.eleph --bound 6
+
+  ok? question(C, elite)  linha 11  -  resposta yes e verdadeira
+  ok? question(C, elite)  linha 13  -  resposta no e verdadeira
+
+SEM CONTRAEXEMPLO  -  dentro dos limites checados, que nao sao exaustivos aqui
+```
+
+Note the vocabulary. `ok?` rather than `ok`, and `SEM CONTRAEXEMPLO` rather
+than `PROVADO`. The tool never claims more than it checked. A fixed bound of
+six was the behaviour in 0.1.0, and it was unsound — this example is the reason
+it changed.
+
+## The last-occurrence lemma
+
+The truth of a formula at the end of a history depends only on **the order of
+the last occurrence of each atom**, plus, for atoms under a `count`, how many
+times they occurred, capped at *n*+1.
+
+Read the operators and it is almost immediate:
+
+| Operator | What it actually asks of the history |
+|---|---|
+| `a(x)` | does a last occurrence of `a(x)` exist |
+| `a since_not b` | does `a`'s last occurrence exist and come after `b`'s |
+| `count a >= n` | how many occurrences, saturating at *n*+1 |
+
+The boolean connectives compose, and a quantifier is a finite disjunction or
+sum of instances that are themselves in the fragment.
+
+## The threshold
+
+Any configuration the lemma admits is realised by a history with one position
+per atom, so
+
+```text
+N  =  sum over DISTINCT atoms a of k(a),    k(a) = 1, or n_max(a)+1 under a count
+```
+
+is a completeness threshold. Unsatisfiability up to `N` is unsatisfiability
+outright.
+
+Two details matter for it being usable rather than merely correct.
+
+**The sum runs over distinct atoms, not syntax nodes.** `once(a) and count(a) >
+2` asks for one occurrence and for three; three occurrences answer both.
+Counting per node is still a valid threshold, just a needlessly large one — and
+large thresholds are what make an exhaustive run unaffordable. Making this
+change in 0.2.0 cut thresholds roughly threefold and made the suite faster.
+
+**The domain is bounded too.** An object with no occurrence in the history
+falsifies every atom naming it, so quantifying over the objects that appear is
+the same as quantifying over an unbounded universe. `W` distinct objects
+suffice: one witness per existential, *n*+1 per counting quantifier, plus the
+obligation's own free variables.
+
+Each obligation is checked at **its own** threshold, so one expensive fact does
+not slow down the rest of the file:
+
+```out
+6 obrigacoes derivadas do texto do programa
+cada uma checada no seu limiar de completude (o maior: 10 eventos) -- exaustivo
+
+PROVADO  -  6 obrigacoes valem para TODO historico, de qualquer tamanho
+```
+
+## Outside the linear fragment
+
+The hypothesis that can fail is that every `since_not` takes **atoms**. A fact
+whose body puts a compound expression there leaves the fragment.
+
+That case does not lose completeness, only its linear bound. Every past
+operator has a one-step recurrence — `once` and `since_not` each carry one bit,
+`count` a counter saturating at *n*+1 — so a formula with *k* temporal
+subformulas is evaluated by a deterministic monitor over
+
+```text
+S  =  2^k  ×  product of (n_i + 2)
+```
+
+states. If some history reaches a violating state, one does so without
+repeating a state, hence in fewer than `S` steps. So `S` is a completeness
+threshold for the whole language.
+
+Quantifiers multiply *k* by the domain size, since an instance per object is
+tracked. That is exponential in principle and small in practice.
+
+<Callout type="limit" title="When even that is unaffordable">
+Past a ceiling of 4096, an exhaustive run is not worth the wait. The checker
+then says the run was not exhaustive rather than pretending, and marks each
+affected obligation with the reason:
+
+```out
+verificacao NAO exaustiva neste programa
+  linha 11: limite pedido abaixo do limiar
+```
+</Callout>
+
+## The vocabulary, exactly
+
+| Verdict | What it means |
+|---|---|
+| `PROVADO` | every obligation holds for **every** history, of any length |
+| `SEM CONTRAEXEMPLO` | nothing broke within the bounds checked, which were not exhaustive here |
+| `REPROVADO` | at least one obligation has a counterexample, printed as a history |
+| `ok` | this obligation was discharged at its completeness threshold |
+| `ok?` | this obligation survived the bound it was given, which was below its threshold |
+
+## Testing the claim itself
+
+The threshold is a claim like any other, so there is an experiment that would
+break it: **no verdict may change above the computed threshold.** It is tested
+by re-checking every obligation of every example at bounds and domains above
+it, in <Source file="tests/test_soundness.py" />.
+
+The full argument, with proofs, is the module docstring of
+<Source file="eleph/threshold.py" />. The two theorems are proved on paper and
+tested rather than mechanised; a Lean 4 artifact for the ground fragment is the
+next thing worth building, and is [where help is
+wanted](/docs/contributing).

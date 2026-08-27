@@ -1,0 +1,98 @@
+---
+title: Obligations derived
+description: The ten correctness conditions, what each one demands, and which are discharged by Z3 versus structurally.
+---
+
+# Obligations derived
+
+<p className="lede">
+A reference table for what the compiler reads off a program. For the reasoning
+behind them, see the <a href="/docs/concepts/obligations">concept page</a>.
+</p>
+
+## The ten
+
+| Obligation | Demands | Checked by |
+|---|---|---|
+| answer is true | on this path, the answer given is entailed by the log | Z3, at the completeness threshold |
+| answer responds to the question asked | the answer is about the subject of the question | Z3 |
+| immediate promise holds when made | φ is true over the log plus what this handler recorded | Z3 |
+| future promise is dischargeable | some path turns φ from false to true | Z3 |
+| offer is honourable | some path could bring φ about | Z3 |
+| sorts agree with declarations | every argument sits in a position of its own sort | compiler, on every fact, used or not |
+| no unguarded door | no handler on a protected subject lacks the gate its neighbour has | structural |
+| exactly one answer per path | every path through a `question` answers once | structural |
+| exactly one reply per path | every path through a `request` accepts or declines once | structural |
+| commitments settled | nothing outstanding is silently forgotten | runtime ledger |
+
+## How each is printed
+
+Run `eleph obligations` to see the conditions without discharging them:
+
+```out
+$ eleph obligations examples/booking.eleph
+
+  linha 23  request(Caller, make_reservation)
+    a promessa esta cumprida ao ser feita
+      supondo   nao (make_reservation(P, F) e desde entao nenhum cancel_reservation(P, F))
+      entao     (make_reservation(P, F) e desde entao nenhum cancel_reservation(P, F))
+
+  linha 29  request(Caller, cancel_reservation)
+    a promessa esta cumprida ao ser feita
+      supondo   (make_reservation(P, F) e desde entao nenhum cancel_reservation(P, F))
+      entao     nao (make_reservation(P, F) e desde entao nenhum cancel_reservation(P, F))
+```
+
+| Line | What it is |
+|---|---|
+| `linha N  handler` | where in the source this obligation came from |
+| the title | which of the ten this is |
+| `supondo` | the path condition: the branch taken to reach the statement |
+| `entao` | the goal: what performing the act claims |
+
+## Polarity
+
+Most obligations are **universal**: no history may make the assumptions true
+and the goal false. Two are **existential** — dischargeability of a future
+promise and honourability of an offer — where what must exist is a path:
+
+```out
+  ok  request(C, make_reservation)  linha 46  -  a promessa pode vir a ser cumprida (antes de board(P, F))
+      cumprivel por: request assign_seat > entao l51
+```
+
+When an existential obligation fails, the checker says so in those terms rather
+than printing a history:
+
+```out
+      nenhum caminho do programa chega a cumprir isso
+```
+
+## Verdicts
+
+| Marker | Meaning |
+|---|---|
+| `ok` | discharged at this obligation's completeness threshold |
+| `ok?` | survived the bound given, which was below the threshold |
+| `X` | a counterexample exists, and is printed |
+| `PROVADO` | every obligation holds for every history, of any length |
+| `SEM CONTRAEXEMPLO` | nothing broke within bounds that were not exhaustive |
+| `REPROVADO` | at least one obligation is not met |
+
+## The soundness claim that links them to the runtime
+
+> **If every obligation is proved, the runtime never refuses.**
+
+The runtime refuses exactly when a speech act's truth condition fails, and the
+deriver emits *path condition implies truth condition* for each such act over
+the same log. The claim is tested by hammering proved programs with random
+pasts and random conversations, and by confirming that unproved ones **do**
+refuse.
+
+It lives in <Source file="tests/test_soundness.py" />.
+
+## Source
+
+Derivation: <Source file="eleph/obligations.py" />. Discharge:
+<Source file="eleph/verify.py" />. Thresholds:
+<Source file="eleph/threshold.py" />.

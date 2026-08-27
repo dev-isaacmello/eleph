@@ -1,0 +1,104 @@
+---
+title: Honest limits
+description: What eleph genuinely cannot do today. Verified, not hedged.
+---
+
+# Honest limits
+
+<p className="lede">
+This is not marketing hedging. Every entry here is verified, and each one is
+present because something is genuinely not covered. Adding to this list is a
+contribution.
+</p>
+
+## There is no wall clock
+
+`since_not` knows **order**, not time. *"Cancel within 24 hours of booking"* is
+not expressible directly.
+
+The pattern that works today, and the one <Source file="bench/taubench/cancel.eleph" />
+uses, is for the host to emit the deadline as an event. The clock lives outside
+the logic, which is how event-sourced systems handle time anyway.
+
+## Numeric fields are compared at the instant the event happens
+
+```eleph
+charged(U, amount > 100)     # this charge, as it happened
+```
+
+That is what keeps the [completeness
+argument](/docs/concepts/completeness) intact, and it is also the limit: you
+can ask whether *this charge* was over 100, not whether the sum of the last
+three was. **Aggregate arithmetic over the history is not expressible.**
+
+## The linear completeness threshold covers a fragment
+
+It holds when every `since_not` takes **atoms**. Outside it, completeness comes
+from the monitor's state space, and past that the checker admits the run was
+not exhaustive.
+
+The threshold also **grows with the constants**: proving something about a
+capacity of 180 needs histories that can hold 180 events.
+
+## A future promise is checked for keepability, not liveness
+
+The compiler proves *some path* establishes it. It cannot prove the caller will
+walk that path, because no program can. See
+[commitments](/docs/concepts/commitments).
+
+## The index needs locality
+
+A subformula naming **fewer variables than its parent** makes one event disturb
+unboundedly many keys. Such programs still run, by rereading the log, and
+`Machine.index.usable` says so — but the constant-time claim does not apply to
+them.
+
+## `spoke` names the exchange, not the content
+
+*"Did I already promise this exact thing?"* is not expressible.
+*"Did I already promise something here?"* is.
+
+## Permission is a fact, not a role system
+
+`permitted` gates a handler on something the log supports, which covers *"is
+this caller authenticated for this account"*. There are **no roles, no
+hierarchy and no delegation**.
+
+## Facts cannot be recursive
+
+Transitive properties are out of reach.
+
+## The τ-bench audit reads natural language with a regex
+
+Assent is matched from a generous word list, so counts **under-report rather
+than over-report**. Sample violations were read by hand before the numbers were
+published. See [the audit](/docs/taubench).
+
+## The theorems are proved on paper and tested, not mechanised
+
+A Lean 4 artifact for the ground fragment is the next thing worth building, and
+is [where help is wanted](/docs/contributing). Estimated at five to nine working
+days; as far as we can tell it would be the first mechanised completeness
+threshold for a temporal specification language.
+
+## Opening a long log replays it
+
+Steady state is constant per event, but opening a log of ten million events
+replays all ten million. A snapshot that can be **checked** against the log
+rather than trusted would keep the derived property. Also [where help is
+wanted](/docs/contributing).
+
+---
+
+## One limit that is not on the list, because it is not a limit
+
+<Callout type="danger" title="A proof says each obligation holds. It does not say the policy is the one you meant.">
+Writing the rule down does not hand you the right rule. It hands you a rule you
+can interrogate.
+
+That distinction is what surfaced the composition hole in the [LangChain
+example](/docs/integration/langchain): two permitted actions composing into a
+forbidden outcome, in a policy that was `PROVADO` before and after the fix.
+Without something to interrogate, the hole would have shipped with the word
+`PROVADO` next to it, which is the worst combination available.
+</Callout>

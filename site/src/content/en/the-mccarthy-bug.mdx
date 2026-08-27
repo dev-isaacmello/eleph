@@ -1,0 +1,162 @@
+---
+title: McCarthy's bug
+description: The one-word difference between "did they make a reservation" and "do they have one", and why the whole language exists to expose it.
+---
+
+# McCarthy's bug
+
+<p className="lede">
+The example is McCarthy's own, and it is nine lines long. A support program is
+asked whether a passenger has a reservation. It answers by checking whether the
+passenger made one. Those are different questions, and the difference is the
+cancellation.
+</p>
+
+## The trap is in the grammar, deliberately
+
+In eleph, a bare event atom means *this happened at least once, ever*:
+
+```eleph
+make_reservation(P, F)      # ever happened
+```
+
+It reads like "has a reservation". It means "made a reservation". The two agree
+right up until someone cancels, and then they never agree again.
+
+This is not an accident of syntax that a better keyword would fix. It is the
+shape of the mistake real systems make: a boolean column called
+`has_reservation` that someone forgot to clear, a cached flag, a summary that
+drifted. The language keeps the trap open on purpose and puts a verifier next
+to it.
+
+## What the verifier does with it
+
+Given the buggy handler, `eleph check` reports:
+
+```out
+  X   question(Caller, has_reservation)  linha 17  -  resposta yes e verdadeira
+
+      historico que quebra a obrigacao:
+        1. make_reservation(P, F)
+        2. cancel_reservation(P, F)
+        3. disse-ask-sobre-has_reservation(Caller, P, F)
+
+      o programa responde yes, a verdade do log e no
+```
+
+Three things in that output are worth separating.
+
+**It is a history, not a stack trace.** The counterexample is a sequence of
+events that any deployment could produce. You can read it to a colleague.
+
+**The third event is the question itself.** The program's own speech acts go
+into the same log as the world's events. That is what makes `spoke` queryable
+later, and it is why the elephant never forgets.
+
+**The last line names both sides.** `o programa responde yes, a verdade do log
+e no` — what the program said, and what the history entails. The obligation is
+the gap between them.
+
+## Why a test would not have found it
+
+A test for this bug requires someone to have thought of cancellation. That is
+the whole difficulty: the bug is invisible precisely to the person who wrote
+it, because they read `make_reservation(P, F)` and heard "has a reservation".
+
+The obligation is not something anyone thought of either. It was derived:
+
+```out
+  linha 17  question(Caller, has_reservation)
+    resposta yes e verdadeira
+      supondo   alguma vez make_reservation(P, F)
+      entao     (make_reservation(P, F) e desde entao nenhum cancel_reservation(P, F))
+```
+
+`supondo` is the path condition — the branch the program took. `entao` is what
+answering `yes` to *that question* claims. The obligation is that the first
+implies the second, and Z3 is asked whether any history makes the first true
+and the second false.
+
+## The fix, and what it costs
+
+```eleph
+on question(Caller, has_reservation(P, F)):
+    if make_reservation(P, F) since_not cancel_reservation(P, F):
+        answer Caller yes
+    else:
+        answer Caller no
+```
+
+The guard is now the fact's own definition, so there is nothing left to
+disagree. Better still, say it once:
+
+```eleph
+on question(Caller, has_reservation(P, F)):
+    answer Caller with has_reservation(P, F)
+```
+
+`answer C with φ` answers whichever way the log says, which is the form that
+cannot be got wrong. The verifier accepts both.
+
+<Callout type="proved">
+```out
+$ eleph check examples/airline.eleph
+
+  ok  question(Caller, has_reservation)  linha 16  -  resposta yes e verdadeira
+  ok  question(Caller, has_reservation)  linha 18  -  resposta no e verdadeira
+
+PROVADO  -  2 obrigacoes valem para TODO historico, de qualquer tamanho
+```
+</Callout>
+
+## A bug that hides deeper
+
+One event's distance is easy. `examples/fundo.eleph` is the same shape of
+mistake at a distance of seven:
+
+<Snippet file="examples/fundo.eleph">
+```eleph
+program milhagem
+sort Passenger
+sort Flight
+event make_reservation(p: Passenger, f: Flight)
+fact elite(P: Passenger, F: Flight) := count make_reservation(P, F) >= 8
+
+on question(C, elite(P, F)):
+    if count make_reservation(P, F) >= 7:
+        answer C yes
+    else:
+        answer C no
+```
+</Snippet>
+
+Seven is not eight. A bounded search that stops at six histories **approves
+it**:
+
+```out
+$ eleph check examples/fundo.eleph --bound 6
+
+  ok? question(C, elite)  linha 11  -  resposta yes e verdadeira
+  ok? question(C, elite)  linha 13  -  resposta no e verdadeira
+
+SEM CONTRAEXEMPLO  -  dentro dos limites checados, que nao sao exaustivos aqui
+```
+
+The `ok?` and the verdict both say the run was not exhaustive. Left to compute
+its own threshold, the checker finds it:
+
+```out
+$ eleph check examples/fundo.eleph
+
+  X   question(C, elite)  linha 11  -  resposta yes e verdadeira
+      historico que quebra a obrigacao:
+        1..7. make_reservation(P, F)
+        8. disse-ask-sobre-elite(C, P, F)
+
+REPROVADO  -  1 obrigacao nao cumprida
+```
+
+This is why the checker computes a [completeness
+threshold](/docs/concepts/completeness) per obligation instead of taking a
+fixed bound. A fixed bound of six was the behaviour in 0.1.0, and it was
+unsound.

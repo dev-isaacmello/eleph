@@ -1,0 +1,91 @@
+---
+title: The past is the only state
+description: There is no assignment in the eleph grammar. A fact is not stored, it is a query over what happened.
+---
+
+# The past is the only state
+
+<p className="lede">
+There is no assignment in the grammar. This is not an omission. There is
+nothing to assign to, because a fact is not stored — it is a query over what
+happened.
+</p>
+
+## A fact is a formula
+
+```eleph
+fact has_reservation(P: Passenger, F: Flight) :=
+    make_reservation(P, F) since_not cancel_reservation(P, F)
+```
+
+`has_reservation` is not a column, a cache, or a field on an object. It is the
+sentence *"there is a `make_reservation` after the last `cancel_reservation`"*,
+evaluated against the log whenever anyone asks.
+
+Nothing is overwritten, so nothing can drift out of agreement with the truth.
+The classic failure — a boolean flag someone forgot to clear — has no shape it
+could take here.
+
+## Everything the program says is also an event
+
+The program's own utterances go into the same log as the world's events, so it
+can be asked what it has already said:
+
+```eleph
+if spoke accept to C about make_reservation(P, F):
+    decline C
+```
+
+This is why the counterexamples that `eleph check` prints include lines like
+`disse-ask-sobre-has_reservation(Caller, P, F)`. A question was asked, so the
+asking happened, so it is in the history.
+
+`spoke` names the exchange and the act, not the propositional content — see
+[the limits](/docs/limits) for exactly what that does and does not let you ask.
+
+## What replaces the things you gave up
+
+| You would have written | You write instead |
+|---|---|
+| `user.active = False` | `record cancelled(u)` |
+| `if user.active:` | `if subscribed(U) since_not cancelled(U):` |
+| a `reservations` table | `count P: Passenger where has_reservation(P, F)` |
+| a `promised_at` column | `promise C that φ before e(...)`, and read the ledger |
+| an audit log written beside the state | there is only the log; the state is derived |
+
+The last row is the one that changes how a system is argued about. In an
+ordinary design the audit log is a second artifact that is supposed to agree
+with the first. Here there is no first.
+
+## Durability comes for free
+
+Nothing but events is written to disk. The index and the commitment ledger are
+rebuilt by living through the past again, so a process that died and came back
+is indistinguishable from one that never died.
+
+```python
+g = policy.guard(log="booking.jsonl")   # reopening replays
+```
+
+A torn final line is dropped: an event that was never finished being written is
+an event that did not happen.
+
+## The objection, and the answer
+
+If the only state is the past, then answering a question means reading the
+past, which is quadratic. It showed: at four thousand interactions an early
+version ran at 46 events per second.
+
+The answer is that every operator here has a one-step recurrence, and one
+lemma makes it sharp — *an event matching none of a subformula's atoms cannot
+change its value*. Folding an event in touches only the keys that event names.
+
+Measured at 145,564 events in 6.1 seconds with flat throughput. The full
+argument and the numbers are on the [performance page](/docs/performance).
+
+<Callout type="proved" title="The optimisation is never trusted">
+Every cell of the index is a pure function of the log — the same function the
+naive evaluator computes by rereading it. That is an optimisation of a truth
+claim, so `Machine(audit=True)` answers every query **both** ways and raises if
+they differ.
+</Callout>

@@ -1,0 +1,138 @@
+---
+title: Statements
+description: Everything a handler body can do — answer, record, accept, decline, promise, offer, release, and if/else.
+---
+
+# Statements
+
+<p className="lede">
+A handler body is a sequence of statements. Every one of them is either a
+speech act, a record of something that happened, or a branch.
+</p>
+
+## The full list
+
+| Statement | What it does |
+|---|---|
+| `answer C yes` | assert the subject holds |
+| `answer C no` | assert the subject does not hold |
+| `answer C with φ` | answer whichever way the log says |
+| `record e(...)` | something happened; append it to the log |
+| `accept C` | accept a request |
+| `decline C` | decline a request |
+| `offer C that φ` | willing, not yet owing |
+| `promise C that φ` | φ is true now |
+| `promise C eventually φ` | φ will hold at some point |
+| `promise C that φ before e(...)` | φ will hold before `e` occurs |
+| `release C from φ` | let the program off a debt |
+| `if φ: … else: …` | branch on the past |
+
+## `answer`
+
+```eleph
+on question(C, has_reservation(P, F)):
+    if has_reservation(P, F):
+        answer C yes
+    else:
+        answer C no
+```
+
+Or, equivalently and unmistakably:
+
+```eleph
+on question(C, has_reservation(P, F)):
+    answer C with has_reservation(P, F)
+```
+
+`answer C with φ` is the form that cannot be got wrong: it answers whichever
+way the log says. The literal forms are what make the [McCarthy
+bug](/docs/the-mccarthy-bug) expressible, and therefore catchable.
+
+Every path through a `question` handler must answer **exactly once**. Both a
+missing answer and a double answer are structural defects.
+
+## `record`
+
+```eleph
+record make_reservation(P, F)
+```
+
+The only way anything ever becomes true. Order matters inside a handler: an
+immediate promise is discharged over the log *plus* whatever was recorded
+before it in this same body.
+
+## `accept` and `decline`
+
+```eleph
+on request(C, make_reservation(P, F)):
+    if has_reservation(P, F):
+        decline C
+    else:
+        record make_reservation(P, F)
+        accept C
+```
+
+Every path through a `request` handler must accept or decline **exactly once**.
+
+Both take an optional explicit subject — `accept C make_reservation(P, F)` —
+when the handler is about one thing and the reply is about another.
+
+## The four commitments
+
+```eleph
+offer    C that φ
+promise  C that φ
+promise  C eventually φ
+promise  C that φ before e(...)
+```
+
+Each carries a different obligation. The full treatment, with the ledger, is on
+the [commitments page](/docs/concepts/commitments).
+
+```eleph
+on request(C, make_reservation(P, F)):
+    if has_reservation(P, F):
+        decline C
+    else:
+        if seats_left(F) and flight_open(F):
+            record make_reservation(P, F)
+            accept C
+            promise C that has_reservation(P, F)
+            promise C that has_seat(P, F) before board(P, F)
+        else:
+            decline C
+```
+
+## `release`
+
+```eleph
+release C from has_seat(P, F)
+```
+
+Lets the program off a debt it can no longer keep — after a cancellation, for
+instance. It is a speech act and goes into the log: a debt quietly dropped and
+a debt formally released are different histories.
+
+## `if` / `else`
+
+```eleph
+if seats_left(F) and flight_open(F):
+    ...
+else:
+    ...
+```
+
+The condition is any [temporal expression](/docs/reference/expressions). The
+branch taken becomes the **path condition** of every obligation derived from
+statements inside it — that is the `supondo` line the checker prints.
+
+`else` is optional, but leaving it off a `question` or `request` handler
+usually creates a path that says nothing, which is a structural defect. The
+checker will say so.
+
+## What is not here
+
+There is no assignment, no loop, no function call, and no variable. That is not
+a subset chosen for simplicity; it is the [design](/docs/concepts/past-is-state).
+The past is the state, so there is nothing to assign to, and a handler runs
+once per utterance, so there is nothing to loop over.

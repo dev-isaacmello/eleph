@@ -1,0 +1,132 @@
+---
+title: Obligations, derived
+description: Ten correctness conditions read off the program text, discharged by Z3 or structurally by the compiler. Nobody writes them.
+---
+
+# Obligations, derived
+
+<p className="lede">
+An obligation is a correctness condition that the program's own text demands.
+You do not write it, annotate it, or configure it. The compiler reads it off
+the handler, and then the checker tries to break it.
+</p>
+
+## The shape of one
+
+Every derived obligation has the same three parts:
+
+| Part | What it is |
+|---|---|
+| **assumptions** (`supondo`) | the path condition — the branch the program took to reach this statement |
+| **goal** (`entao`) | what performing that speech act claims about the log |
+| **polarity** | whether the goal must hold on every such history, or on at least one |
+
+Printed:
+
+```out
+  linha 17  question(Caller, has_reservation)
+    resposta yes e verdadeira
+      supondo   alguma vez make_reservation(P, F)
+      entao     (make_reservation(P, F) e desde entao nenhum cancel_reservation(P, F))
+```
+
+Read as: *on the path where `make_reservation(P, F)` ever happened, answering
+`yes` claims that a reservation currently stands.* Z3 is asked whether any
+history makes the assumption true and the goal false.
+
+Use `eleph obligations <file>` to see them without discharging them. That
+command exists to make one point: **nobody wrote these.**
+
+## The ten
+
+| Obligation | Checked by |
+|---|---|
+| answer is true | Z3, at the completeness threshold |
+| answer responds to the question asked | Z3 |
+| immediate promise holds when made | Z3, over the log plus what the handler just recorded |
+| future promise is one some path can bring about | Z3, requiring the path to turn it from false to true |
+| argument sorts agree with declarations | compiler, on every fact, used or not |
+| an offer is one some path could honour | Z3 |
+| no door onto a protected subject is left unlocked | structural |
+| every path answers exactly once | structural |
+| every request is accepted or declined exactly once | structural |
+| outstanding and breached commitments | runtime ledger |
+
+The last one is the only one that is not static. A promise about the future
+cannot be discharged before the future arrives, so the runtime keeps a ledger
+and reports what is outstanding and what was breached.
+
+## Three of them, in more detail
+
+### Answer is true
+
+McCarthy's first axiom. Every `answer C yes`, `answer C no` and `answer C with
+φ` must be entailed by the log at the moment it is said. This is the one the
+[McCarthy bug](/docs/the-mccarthy-bug) violates.
+
+### Immediate promise holds when made
+
+`promise C that φ` claims that φ is true *now*, and the check runs over the log
+plus whatever the handler recorded on the way here:
+
+```eleph
+on request(Caller, make_reservation(P, F)):
+    if has_reservation(P, F):
+        decline Caller
+    else:
+        record make_reservation(P, F)
+        accept Caller
+        promise Caller that has_reservation(P, F)
+```
+
+The promise is only provable because `record` came first in that same handler.
+Move the `record` after the `promise` and the obligation fails.
+
+### Future promise is keepable
+
+`promise C eventually φ` and `promise C that φ before e(...)` cannot be true
+when said — that is what makes them future promises. What the compiler proves
+instead is that *some path through this program establishes φ*, and it requires
+that path to turn φ from false to true:
+
+```out
+  ok  request(C, make_reservation)  linha 46  -  a promessa pode vir a ser cumprida (antes de board(P, F))
+      cumprivel por: request assign_seat > entao l51
+```
+
+The trace names the path. An earlier version of this check accepted any
+satisfiable formula, which made it vacuous; that was fixed in 0.2.0.
+
+<Callout type="limit" title="Keepability is not liveness">
+The compiler proves a path exists. It cannot prove the caller will walk it,
+because no program can. What happens if they do not is the ledger's business.
+</Callout>
+
+## Structural defects
+
+Three of the ten never reach the solver. They are properties of the program's
+shape:
+
+* **Every path answers exactly once.** A `question` handler with a branch that
+  says nothing, or one that answers twice, is a defect.
+* **Every request is accepted or declined exactly once.** Same argument for
+  `request`.
+* **No unguarded door.** One handler on a subject requiring `permitted` and its
+  neighbour on the same subject requiring none is a locked front door beside an
+  open window. Added in 0.3.0; see [permission](/docs/concepts/permission).
+
+Structural defects are reported before the solver runs and are counted as
+failures:
+
+```out
+  X   question(Quem, saldo)  linha 22
+      outro handler sobre este assunto exige permissao e este nao
+```
+
+## Where they come from
+
+Derivation lives in <Source file="eleph/obligations.py" />, and discharge in
+<Source file="eleph/verify.py" />. The soundness claim connecting the two — *if
+every obligation is proved, the runtime never refuses* — is tested by hammering
+proved programs with random pasts and random conversations in
+<Source file="tests/test_soundness.py" />.

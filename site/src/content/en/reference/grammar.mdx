@@ -1,0 +1,138 @@
+---
+title: Grammar
+description: The complete surface syntax of eleph, keywords, and lexical rules.
+---
+
+# Grammar
+
+<p className="lede">
+The whole surface syntax, in one place. It is small on purpose.
+</p>
+
+## Notation
+
+`x*` is zero or more, `x+` is one or more, `[x]` is optional, `|` is
+alternation. `INDENT` and `DEDENT` are produced by the lexer from leading
+spaces, Python-style.
+
+## Program
+
+```text
+program        ::= "program" IDENT NEWLINE decl*
+
+decl           ::= sort_decl | event_decl | fact_decl | handler
+
+sort_decl      ::= "sort" IDENT NEWLINE
+event_decl     ::= "event" IDENT param_list NEWLINE
+fact_decl      ::= "fact" IDENT param_list ":=" texpr NEWLINE
+
+param_list     ::= [ "(" [ param ("," param)* ] ")" ]
+param          ::= IDENT [ ":" IDENT ]
+```
+
+## Handlers
+
+```text
+handler        ::= "on" performative "(" IDENT "," ref ")"
+                   [ "permitted" ref ] ":" NEWLINE block
+
+performative   ::= "question" | "request"
+
+block          ::= INDENT stmt+ DEDENT
+```
+
+## Statements
+
+```text
+stmt           ::= if_stmt
+                 | answer_stmt
+                 | "record" ref NEWLINE
+                 | ("accept" | "decline") IDENT [ ref ] NEWLINE
+                 | promise_stmt
+                 | "offer" IDENT "that" texpr NEWLINE
+                 | "release" IDENT "from" texpr NEWLINE
+
+if_stmt        ::= "if" texpr ":" NEWLINE block
+                   [ "else" ":" NEWLINE block ]
+
+answer_stmt    ::= "answer" IDENT ( "yes" | "no" | "with" texpr ) NEWLINE
+
+promise_stmt   ::= "promise" IDENT "eventually" texpr NEWLINE
+                 | "promise" IDENT "that" texpr [ "before" ref ] NEWLINE
+```
+
+## Temporal expressions
+
+```text
+texpr          ::= or_expr
+or_expr        ::= and_expr ( "or" and_expr )*
+and_expr       ::= since_expr ( "and" since_expr )*
+since_expr     ::= unary [ "since_not" unary ]
+unary          ::= "not" unary | primary
+
+primary        ::= "(" texpr ")"
+                 | "yes" | "no"
+                 | "exists" binder since_expr
+                 | "count" binder since_expr comparison
+                 | "count" ref comparison
+                 | "spoke" perf "to" IDENT "about" ref
+                 | ref
+
+binder         ::= IDENT ":" IDENT "where"
+comparison     ::= OP NUMBER
+perf           ::= "answer" | "accept" | "decline" | "promise" | "ask"
+
+ref            ::= IDENT [ "(" [ arg ("," arg)* ] ")" ]
+arg            ::= IDENT [ OP NUMBER ]
+```
+
+The `arg` production with a comparison is the numeric-field form:
+`charged(U, C, amount > 100)`.
+
+## Tokens
+
+```text
+NUMBER   ::= [0-9]+
+IDENT    ::= [A-Za-z_][A-Za-z_0-9]*
+ASSIGN   ::= ":="
+OP       ::= ">=" | "<=" | "==" | "!=" | "<" | ">"
+PUNCT    ::= "(" | ")" | ":" | ","
+COMMENT  ::= "#" .*
+```
+
+## Keywords
+
+Reserved, and unusable as identifiers:
+
+```text
+program  event  fact  on  if  else  answer  with
+yes  no  record  accept  decline  promise  that
+not  and  or  since_not  count  to
+sort  exists  where
+spoke  about
+eventually  before  release  from
+permitted  offer
+```
+
+The list is in <Source file="eleph/lexer.py" />, in this order.
+
+## Lexical rules
+
+* Blank lines and comment-only lines carry **no indentation meaning**.
+* Indentation must use spaces. A tab in the leading whitespace is an error:
+  `linha N: use espacos, nao tabs, para indentar`.
+* A dedent must return to a level that was previously opened, or:
+  `linha N: indentacao inconsistente`.
+* There is no line continuation. An expression spanning lines must be
+  parenthesised inside a block that is already indented — in practice, keep
+  facts on one line or break after `:=`.
+
+## Errors
+
+Three exception types reach the CLI, and all three exit with status `2`:
+
+| Exception | Raised by | Example message |
+|---|---|---|
+| `LexError` | <Source file="eleph/lexer.py" /> | `linha 4: caractere inesperado '@'` |
+| `ParseError` | <Source file="eleph/parser.py" /> | `linha 9: esperava 'yes', 'no' ou 'with'` |
+| `ResolveError` | <Source file="eleph/core.py" /> | an unknown name, or an arity or sort mismatch |

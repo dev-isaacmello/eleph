@@ -1,0 +1,163 @@
+---
+title: Program structure
+description: The four top-level forms — program, sort, event, fact — and the handlers that answer questions and requests.
+---
+
+# Program structure
+
+<p className="lede">
+A file declares a program, the sorts of thing it talks about, the events that
+can happen, the facts those events make true, and the handlers that speak. It
+is indentation-significant, Python-style, with spaces only.
+</p>
+
+## The shape of a file
+
+```eleph
+program airline
+
+sort Passenger
+sort Flight
+
+event make_reservation(p: Passenger, f: Flight)
+
+fact has_reservation(P: Passenger, F: Flight) :=
+    make_reservation(P, F) since_not cancel_reservation(P, F)
+
+on question(C, has_reservation(P, F)):
+    answer C with has_reservation(P, F)
+```
+
+`program` must come first. After it, `sort`, `event`, `fact` and `on` may
+appear in any order. Comments run from `#` to end of line.
+
+## `program`
+
+```eleph
+program companhia
+```
+
+One per file, and it names the program. That name appears in the checker's
+header.
+
+## `sort`
+
+```eleph
+sort Passenger
+sort Flight
+```
+
+A sort is a kind of object. Declaring them is optional — `event
+make_reservation(passenger, flight)` with no annotations parses — but sorts do
+two things worth having:
+
+* they let the compiler catch an argument in the wrong position;
+* they bound the domain the checker quantifies over, which is what
+  `exists P: Sort where` and `count P: Sort where` need.
+
+Two built-in sorts exist and need no declaration:
+
+| Sort | Used for |
+|---|---|
+| `Party` | who is speaking or being spoken to |
+| `Number` | a numeric event field |
+
+<Callout type="note" title="Sort labels are distinct">
+`Party` and `Passenger` both begin with `p`. Before 0.2.0 that made two sorts
+indistinguishable in a printed counterexample. They no longer collide.
+</Callout>
+
+## `event`
+
+```eleph
+event make_reservation(p: Passenger, f: Flight)
+event charged_while_active(u: User, c: Charge, amount: Number)
+event close_flight(f: Flight)
+```
+
+An event is something that can happen. Parameters are `name: Sort`, and the
+annotation is optional. Events are the **only** source of truth: nothing else
+can make a fact true.
+
+Parameterless events are allowed — write `event tick` or `event tick()`.
+
+## `fact`
+
+```eleph
+fact has_seat(P: Passenger, F: Flight) :=
+    assign_seat(P, F) since_not cancel_reservation(P, F)
+
+fact seats_left(F: Flight) :=
+    count P: Passenger where has_reservation(P, F) < 2
+
+fact flight_open(F: Flight) := not close_flight(F)
+```
+
+A fact is a **named temporal expression**, not a stored value. Its parameters
+are logical variables, conventionally capitalised, and its body is any
+[temporal expression](/docs/reference/expressions). Facts may reference other
+facts.
+
+Every declared fact is type-checked whether anything calls it or not. Before
+0.3.0 resolution was lazy, so a fact no handler mentioned was never checked at
+all.
+
+<Callout type="limit">
+Facts cannot be recursive, so transitive properties are out of reach.
+</Callout>
+
+## `on` — handlers
+
+```eleph
+on question(C, has_reservation(P, F)):
+    answer C with has_reservation(P, F)
+
+on request(C, make_reservation(P, F)):
+    if has_reservation(P, F):
+        decline C
+    else:
+        record make_reservation(P, F)
+        accept C
+        promise C that has_reservation(P, F)
+```
+
+Two performatives exist:
+
+| Performative | Body must | Answered with |
+|---|---|---|
+| `question` | answer on every path, exactly once | `answer C yes` / `no` / `with φ` |
+| `request` | accept or decline on every path, exactly once | `accept C` / `decline C` |
+
+The first argument binds the caller. The second is the subject: an event for
+`request`, a fact for `question`. Variables in the subject are bound across the
+whole body.
+
+"Exactly once on every path" is a [structural
+obligation](/docs/concepts/obligations) — a branch that says nothing, or says
+two things, is a defect.
+
+### Gating on authority
+
+```eleph
+on question(Quem, saldo(C)) permitted pode_perguntar(Quem, C):
+    answer Quem with saldo(C)
+```
+
+`permitted` takes a fact and joins the path condition of every obligation
+derived from the handler. See [permission](/docs/concepts/permission).
+
+## Lexical rules
+
+* **Spaces, never tabs.** A tab in the indentation is an error, by name:
+  `use espacos, nao tabs, para indentar`.
+* **Indentation must be consistent.** Dedents must return to a level that was
+  opened.
+* Identifiers are `[A-Za-z_][A-Za-z_0-9]*`. Capitalisation carries convention
+  but not meaning: sorts and logical variables are capitalised, events and
+  facts are not.
+* Numbers are non-negative integers.
+* Comparison operators are `>=`, `<=`, `==`, `!=`, `<`, `>`. Definition is
+  `:=`.
+
+The full keyword list is in <Source file="eleph/lexer.py" />, and the grammar is
+on the [grammar page](/docs/reference/grammar).

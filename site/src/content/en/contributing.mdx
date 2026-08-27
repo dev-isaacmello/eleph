@@ -1,0 +1,138 @@
+---
+title: Contributing
+description: The one rule, what a good change looks like, and the five places help is wanted.
+---
+
+# Contributing
+
+<p className="lede">
+A few things about how this project works that are worth knowing before you
+spend time on it. The canonical copy is <a
+href="https://github.com/dev-isaacmello/eleph/blob/main/CONTRIBUTING.md">CONTRIBUTING.md</a>.
+</p>
+
+## The one rule
+
+<Callout type="danger" title="Do not publish a number you have not read by hand.">
+Every quantitative claim in this repository survived an audit of individual
+cases, and **three of them changed as a result**. The first count of
+unconfirmed writes charged a batch under one `yes`. The second called an
+upgrade-then-cancel a violation, which the policy expressly allows. The third
+modelled a mutable attribute with "happened once". Each correction made the
+number **smaller** and the claim stronger.
+
+If you add a measurement, add the hand audit that justifies it, and say in the
+docstring what you checked.
+</Callout>
+
+## Setup
+
+```bash
+uv venv && uv pip install -e ".[dev]"
+pytest -q
+```
+
+The τ-bench tests download about 6 MB on first run and skip cleanly with no
+network.
+
+## What a good change looks like
+
+* **A test that would fail without it.** Tests here are the argument, not the
+  chore. <Source file="tests/test_soundness.py" /> and
+  <Source file="tests/test_incremental.py" /> exist to try to break claims made
+  elsewhere in the codebase; that is the shape to copy.
+* **An honest limit, if the change has one.** The [honest
+  limits](/docs/limits) list is not marketing hedging. It is verified, and
+  every entry is there because something is genuinely not covered. **Adding to
+  it is a contribution.**
+* **Comments that say why, not what.** The code is read by people deciding
+  whether to trust it.
+
+## Places help is wanted
+
+| Where | What | Size |
+|---|---|---|
+| **Lean 4** | Mechanise the two theorems, scoped to the ground fragment. Nothing to port exists in mathlib, Rocq or Isabelle, so this would be, as far as we can tell, the **first mechanised completeness threshold for a temporal specification language**. | five to nine working days |
+| **A wall clock** | `since_not` knows order, not time. Timestamped events with interval comparison would need the completeness argument reworked. | research-sized, not a weekend |
+| **Data in events** | Typed payload fields survive the last-occurrence abstraction if predicates are per event, but the Z3 encoding and the threshold both need work. | |
+| **More τ-bench rules** | Baggage allowance by tier and cabin is the obvious next one. | |
+| **Snapshotting** | Opening a log of ten million events replays all ten million. A snapshot that can be **checked** against the log, rather than trusted, would keep the derived property. | |
+
+## Style
+
+Follow the surrounding code. **Portuguese in user-facing CLI strings, English
+in identifiers, docstrings and comments.** Do not use the em dash character.
+
+## Releasing
+
+Pushing a tag publishes. `.github/workflows/release.yml` does the work, and
+most of what it does is refuse to.
+
+```bash
+# 1. bump the single source of truth
+$EDITOR pyproject.toml        # version = "0.4.0"
+
+# 2. say what changed
+$EDITOR CHANGELOG.md
+
+# 3. commit, tag, push
+git commit -am "chore: release 0.4.0"
+git tag -a v0.4.0 -m "eleph 0.4.0"
+git push origin main --tags
+```
+
+The workflow then checks, in order:
+
+<Steps>
+<li>the tag agrees with `pyproject.toml`;</li>
+<li>the version has never been published — PyPI never lets a version be
+replaced or reused, so this is the last moment it can be caught;</li>
+<li>the tests pass on both the oldest and the newest supported interpreter;</li>
+<li>the artifacts are well formed;</li>
+<li>the built wheel installs into a clean environment and still proves and
+refuses the right programs.</li>
+</Steps>
+
+Only then does it upload, and cut a GitHub release with the artifacts attached.
+
+<Callout type="note" title="3.11 in that list is not ceremony">
+The one bug that reached a published version was a syntax error only 3.11 saw.
+</Callout>
+
+`__version__` is read from the installed package metadata rather than written
+down a second time. A version repeated in two files is a version that will
+eventually disagree with itself, quietly, in a release.
+
+### Setting it up
+
+The workflow needs one repository secret, `PYPI_API_TOKEN`, **scoped to this
+project rather than to the whole account**. It runs in a GitHub environment
+named `pypi`, so required reviewers can be added there if uploads should be
+approved by a human.
+
+To rehearse without publishing anything, run the workflow manually from the
+Actions tab with `dry_run` left checked: everything happens except the upload.
+
+Trusted publishing is the better arrangement if you would rather not keep a
+token at all, and would replace the secret with an OIDC exchange.
+
+## This documentation site
+
+The site lives in <Source file="site" /> — Vite, React and MDX, deployed on
+Vercel. Content is one MDX file per page under `src/content/en/`, and the
+sidebar is `src/lib/nav.ts`: a page cannot exist without being reachable, and
+cannot be reachable without existing.
+
+Every terminal block on this site is a real run, pasted. If you change output
+the CLI produces, the pages quoting it need re-pasting rather than editing.
+
+```bash
+cd site
+npm install
+npm run dev
+```
+
+## Licence
+
+By contributing you agree your work is released under the MIT licence in
+<Source file="LICENSE" />.

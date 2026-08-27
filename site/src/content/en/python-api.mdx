@@ -1,0 +1,252 @@
+---
+title: Python API
+description: Policy, Guard and the three integration shapes — observer, guard, language — with the full method reference.
+---
+
+# Python API
+
+<p className="lede">
+The language is the research artifact. What most systems need is smaller, and
+it ships as a library: a thing that watches what happened, tells you what is
+true of it, refuses to let you assert what is not, and remembers what you
+promised.
+</p>
+
+```python
+from eleph import Policy
+
+policy = Policy.from_file("booking.eleph")
+assert policy.verify().proved          # the same file, proved statically
+
+g = policy.guard(log="booking.jsonl")  # durable, reopening replays
+
+g.record("make_reservation", "alice", "ba117")
+g.holds("has_reservation", "alice", "ba117")                  # True
+g.assert_answer("has_reservation", False, "alice", "ba117")   # raises
+
+g.promise("alice", "has_seat", "alice", "ba117",
+          before=("board", ("alice", "ba117")))
+g.outstanding()        # what is still owed, to whom
+```
+
+## Three shapes, cheapest first
+
+| Shape | You change | You get |
+|---|---|---|
+| **observer** | nothing, you feed it events | what is true of the record, and an audit |
+| **guard** | assertions and tool calls route through it | ungrounded claims raise instead of shipping |
+| **language** | handlers written in `.eleph` | the static proof |
+
+`python examples/agente.py` runs all three against
+<Source file="examples/companhia.eleph" />.
+
+<Callout type="proved" title="Why a policy file rather than Python checks">
+**The rules your guard enforces at three in the morning are the same artifact a
+solver proved.** A guard whose rules were proved is a different thing from a
+guard whose rules someone believed.
+</Callout>
+
+## `Policy`
+
+A parsed policy: the facts a system is willing to be held to.
+
+```python
+from eleph import Policy
+
+policy = Policy("program p\nevent e(x)\nfact f(X) := e(X)\n")
+policy = Policy.from_file("booking.eleph")
+```
+
+| Member | Returns | Notes |
+|---|---|---|
+| `Policy(source)` | | parses a policy from a string |
+| `Policy.from_file(path)` | `Policy` | parses a policy from disk |
+| `.verify(bound=None, objects=None)` | `VerifyReport` | runs the static checker over this policy's handlers |
+| `.guard(log=None, audit=False)` | `Guard` | a live view of one history |
+| `.facts()` | `list[str]` | declared fact names |
+| `.events()` | `list[str]` | declared event names, excluding synthetic speech events |
+| `.program` | AST | the parsed program |
+| `.source` | `str` | the text it was parsed from |
+
+## `VerifyReport`
+
+```python
+report = policy.verify()
+
+report.proved      # True when every obligation holds for every history
+report.failures    # the results that did not hold
+report.structural  # structural defects, if any
+report.results     # every result
+print(report.summary())
+```
+
+`proved` is `True` only when there are **no structural defects** and every
+result was discharged at its completeness threshold. A report with no
+counterexamples but a non-exhaustive run is not `proved`, and `summary()` says
+which case you are in:
+
+```text
+6 obrigacoes provadas para todo historico
+2 de 6 obrigacoes nao se sustentam
+1 defeito(s) estrutural(is)
+6 obrigacoes sem contraexemplo, nao exaustivo
+```
+
+## `Guard`
+
+A live view of one history: what is true, and what is owed.
+
+```python
+g = policy.guard(log="booking.jsonl", audit=False)
+```
+
+| Argument | Effect |
+|---|---|
+| `log` | path to an append-only JSONL history. Reopening replays it |
+| `audit` | answer every query **both** ways — through the index and by rereading the log — and raise if they differ |
+
+### History
+
+```python
+g.record("make_reservation", "alice", "ba117")
+g.events        # tuple[Event, ...]  world events, speech excluded
+```
+
+`record` raises `UnknownName` if the event is not declared or the arity is
+wrong. It is the only way anything ever becomes true.
+
+### Truth
+
+```python
+g.holds("has_reservation", "alice", "ba117")        # -> bool
+g.require("has_reservation", "alice", "ba117")      # raises Ungrounded if not
+g.assert_answer("has_reservation", True, "alice", "ba117")
+```
+
+| Method | Use it for |
+|---|---|
+| `holds(fact, *args)` | ask what is true of the record |
+| `require(fact, *args)` | gate a tool call on a precondition |
+| `assert_answer(fact, value, *args)` | the answer axiom, usable directly: say only what is so |
+
+`assert_answer` is the one that stops a model shipping an ungrounded claim:
+
+```python
+try:
+    g.assert_answer("has_reservation", model_said_yes, "alice", "ba117")
+except Ungrounded as e:
+    ...   # e: tentou afirmar has_reservation(alice, ba117) = True
+          #    quando o log diz False
+```
+
+### Commitments
+
+```python
+g.promise("alice", "has_seat", "alice", "ba117")                       # eventually
+g.promise("alice", "has_seat", "alice", "ba117",
+          before=("board", ("alice", "ba117")))                        # before an event
+
+g.release("alice", "has_seat", "alice", "ba117")
+
+g.outstanding()   # list[Commitment]  still owed
+g.breached()      # list[Commitment]  not kept
+g.ledger          # list[Commitment]  every commitment, with status
+print(g.report())
+```
+
+The promise is written to the log as an event. Whether it was kept, broken or
+released **follows from the events that came after it**, so it is recomputed on
+replay rather than stored.
+
+## Exceptions
+
+| Exception | Raised when |
+|---|---|
+| `Ungrounded` | you asserted, or required, something the history does not support |
+| `UnknownName` | you named an event or fact the policy does not declare, or got its arity wrong |
+| `NotPermitted` | a handler's `permitted` fact does not hold for this caller |
+| `Refusal` | base class; the runtime refused a speech act |
+
+`Ungrounded` subclasses `Refusal`, so `except Refusal` catches both.
+
+## The three shapes, in code
+
+### 1. Observer — nothing changes
+
+```python
+g = policy.guard()
+
+for event in [("make_reservation", "alice", "ba117"),
+              ("make_reservation", "bruno", "ba117"),
+              ("cancel_reservation", "alice", "ba117")]:
+    g.record(*event)
+
+g.holds("has_reservation", "alice", "ba117")   # False
+g.holds("has_reservation", "bruno", "ba117")   # True
+g.holds("seats_left", "ba117")                 # True
+```
+
+Nothing can break, because nothing is enforced yet. This is how the [τ-bench
+audit](/docs/taubench) works over someone else's traces.
+
+### 2. Guard — the model proposes, the log disposes
+
+```python
+def answer(question, model_said, fact, *args):
+    try:
+        g.assert_answer(fact, model_said, *args)
+        return "yes" if model_said else "no"
+    except Ungrounded as e:
+        return f"REFUSED: {e}"
+
+def run_tool(tool, precondition, *args):
+    g.require(precondition, *args)   # raises rather than proceeding
+    g.record(tool, *args)
+```
+
+### 3. Ledger — surviving the process
+
+```python
+g = policy.guard(log=log)
+g.record("make_reservation", "bruno", "lh42")
+g.promise("bruno", "has_seat", "bruno", "lh42",
+          before=("board", ("bruno", "lh42")))
+
+g.record("board", "bruno", "lh42")     # boarded with no seat
+g.machine.store.close()
+
+# -- the process dies here --
+
+revived = policy.guard(log=log)
+print(revived.report())                # the breach is still there
+```
+
+Nothing was saved but events. The ledger is derived.
+
+## Lower level
+
+Two more things are exported for when the `Guard` shape does not fit.
+
+```python
+from eleph import Machine, Store, Event, Commitment
+```
+
+| Object | What it is |
+|---|---|
+| `Machine(program, audit=False)` | the runtime itself: log, index, ledger, transcript |
+| `Store(path, fsync=False)` | the append-only JSONL log. `fsync=True` gives durability per event at roughly 100× cost |
+| `Event(name, args)` | one immutable event |
+| `Commitment` | one debt, with `party`, `mode`, `deadline`, `status` |
+
+```python
+m = Machine(policy.program, audit=True).attach(Store("log.jsonl"))
+m.log            # every event, speech included
+m.transcript     # the human-readable exchange
+m.outstanding()  # list[Commitment]
+```
+
+<Callout type="note" title="Thread safety">
+Concurrent writers are serialised around the index. A `Store` opened with
+`fsync=True` writes through on every event; the default batches, which is the
+right choice unless a lost tail is worse than a hundredfold slowdown.
+</Callout>

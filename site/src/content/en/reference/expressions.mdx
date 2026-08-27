@@ -1,0 +1,154 @@
+---
+title: Temporal expressions
+description: Every operator that reads the past — atoms, since_not, count, quantifiers, spoke, numeric fields — and what each one asks of the history.
+---
+
+# Temporal expressions
+
+<p className="lede">
+Everything a program can know is a formula about its log. These are the forms
+that formula can take.
+</p>
+
+## The table
+
+| Form | Meaning |
+|---|---|
+| `e(a, b)` | event `e` occurred **at least once** in the past |
+| `a since_not b` | `a` occurred and no `b` has occurred since |
+| `count e(a) >= n` | how many times `e` occurred |
+| `exists P: Sort where φ` | some object satisfies φ now |
+| `count P: Sort where φ >= n` | how many do, which is what a seat limit needs |
+| `spoke accept to C about e(...)` | the program performed that act in that exchange |
+| `e(a, amount > 100)` | a numeric field of the event, tested as it happens |
+| `not`, `and`, `or` | as usual |
+
+Parentheses group. `not` binds tightest, then `since_not`, then `and`, then
+`or`.
+
+## Atoms: the trap, on purpose
+
+```eleph
+make_reservation(P, F)
+```
+
+A bare event atom means *this happened at least once, ever*. It reads like
+"has" and means "made". The two agree until the first cancellation and never
+after.
+
+<Callout type="danger" title="This is the language's one deliberate trap">
+Bare `e(a, b)` is kept because it is the mistake real systems make. The
+verifier is what tells the two apart — see [McCarthy's
+bug](/docs/the-mccarthy-bug).
+</Callout>
+
+## `since_not`
+
+```eleph
+make_reservation(P, F) since_not cancel_reservation(P, F)
+```
+
+Exactly: *there is an `a` after the final `b`*. This is the operator that makes
+a fact behave like a mutable field without being one.
+
+```eleph
+fact active(U: User) := subscribed(U) since_not cancelled(U)
+fact flight_open(F: Flight) := not close_flight(F)
+```
+
+Its operands being **atoms** is the hypothesis of the linear [completeness
+threshold](/docs/concepts/completeness). A compound expression under
+`since_not` still verifies, just at the monitor's state-space bound.
+
+## `count` over occurrences
+
+```eleph
+count make_reservation(P, F) >= 8
+```
+
+How many times the atom occurred. Any of `>=`, `<=`, `==`, `!=`, `<`, `>`
+against a non-negative integer.
+
+The constant matters for cost: proving something about a capacity of 180 needs
+histories that can hold 180 events.
+
+## Quantifiers
+
+```eleph
+exists P: Passenger where has_reservation(P, F)
+
+fact seats_left(F: Flight) := count P: Passenger where has_reservation(P, F) < 2
+```
+
+`exists` asks whether **some** object of that sort satisfies the body now.
+`count … where` asks how many do, which is what a capacity limit needs — this
+is McCarthy's own example, and it is not expressible without quantification.
+
+The checker bounds the domain: an object with no occurrence in the history
+falsifies every atom naming it, so quantifying over the objects that appear is
+the same as quantifying over an unbounded universe.
+
+## `spoke`
+
+```eleph
+if spoke accept to C about make_reservation(P, F):
+    decline C
+```
+
+The program's own utterances are events in the same log, so it can ask what it
+already said. The recordable performatives are:
+
+`answer` · `accept` · `decline` · `promise` · `ask`
+
+<Callout type="limit">
+`spoke` names the **exchange and the act**, not the propositional content.
+*"Did I already promise this exact thing?"* is not expressible. *"Did I already
+promise something here?"* is.
+</Callout>
+
+## Numeric fields
+
+```eleph
+event charged_while_active(u: User, c: Charge, amount: Number)
+
+fact refundable(U: User, C: Charge) :=
+    charged_after_cancelling(U, C, amount > 0) since_not refunded(U, C)
+
+fact within_limit(U: User, C: Charge) :=
+    charged_after_cancelling(U, C, amount <= 200) since_not refunded(U, C)
+```
+
+A comparison in an argument position constrains a numeric field of the event.
+The comparison is **part of the atom's identity** rather than a separate fact
+that could move underneath it, which is what keeps the completeness argument
+intact.
+
+<Callout type="limit" title="Compared at the instant the event happens">
+You can ask whether *this charge* was over 100. You cannot ask whether the sum
+of the last three was. Aggregate arithmetic over the history is not
+expressible.
+</Callout>
+
+## Booleans
+
+```eleph
+not close_flight(F)
+has_reservation(P, F) and flight_open(F)
+refundable(U, C) and not within_limit(U, C)
+```
+
+`yes` and `no` are also literals inside an expression, so `answer C with yes`
+parses and means the constant.
+
+## Facts compose
+
+A fact may reference any other fact, and that is the intended way to build up a
+policy:
+
+```eleph
+fact may_refund(U: User, C: Charge)        := refundable(U, C) and within_limit(U, C)
+fact needs_escalation(U: User, C: Charge)  := refundable(U, C) and not within_limit(U, C)
+```
+
+Both of those are proved for every history in
+<Source file="examples/langchain-agent/policy.eleph" />.

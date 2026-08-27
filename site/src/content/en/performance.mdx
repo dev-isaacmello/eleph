@@ -1,0 +1,110 @@
+---
+title: Performance
+description: Constant time per event over a history that never stops growing, and the audit that keeps the optimisation honest.
+---
+
+# Performance
+
+<p className="lede">
+The obvious objection to a language whose only state is its past is that
+answering a question means reading the past. That is quadratic, and it showed:
+at four thousand interactions an early version ran at 46 events per second.
+</p>
+
+## The recurrences
+
+Every temporal operator here has a one-step recurrence:
+
+```text
+once(x)@t          =  x@t  or  once(x)@(t-1)
+(a since_not b)@t  =  a@t  or  ((a since_not b)@(t-1) and not b@t)
+count(a)@t         =  count(a)@(t-1) + [a@t]
+```
+
+That is the dynamic-programming reading of past-time temporal logic (Havelund
+and Roșu, 2001). On its own it gives linear time per event, which is still too
+much when the number of tracked keys grows with the history.
+
+## The locality lemma
+
+> **If an event matches none of a subformula's atoms, the subformula's value is
+> unchanged.**
+
+*Proof.* Read the recurrences with `x@t = a@t = false`: `once` keeps its value,
+`since_not` keeps its value (`b@t` is false, so the conjunct survives), and the
+count increments by zero. ∎
+
+So folding an event in touches only the keys that event **names**, and there
+are at most as many of those as the event has arguments. Updating is O(1) in
+the length of the log.
+
+## Measured
+
+```out
+$ python bench/scaling.py
+
+interacoes      log   relendo   indice   ganho     ev/s  escala
+       500     1134      1.62    0.058     28x    19482       -
+      1000     2274      6.15    0.109     56x    20867   x1.87
+                       (x3.8)
+      2000     4554     24.97    0.208    120x    21890   x1.91
+                       (x4.1)
+      4000     9100         -    0.381      -    23912   x1.83
+      8000    18192         -    0.830      -    21909   x2.18
+```
+
+Time doubles when the work doubles, where rereading the log quadrupled. The
+`relendo` column stops at two thousand because past that it is not worth
+waiting for.
+
+Measured at **145,564 events in 6.1 s** with flat throughput — about 24,000
+events per second, and the rate does not decay as the log grows.
+
+## The optimisation is never trusted
+
+Every cell of the index is a pure function of the log — the same function the
+naive evaluator computes by rereading it. That makes it an optimisation of a
+**truth claim**, which is not the kind of thing to take on faith:
+
+```python
+g = policy.guard(audit=True)
+```
+
+`Machine(audit=True)` answers every query **both** ways and raises if they ever
+differ. It is exercised over random pasts and histories past a thousand events
+in <Source file="tests/test_incremental.py" />, which is the only reason to
+believe <Source file="eleph/incremental.py" />.
+
+<Callout type="proved" title="The third claim, and the experiment that would break it">
+**The index computes what the log computes.** If the two evaluators ever
+disagree on any history, the claim is false and the test says so.
+</Callout>
+
+## When the index does not apply
+
+<Callout type="limit" title="The index needs locality">
+A subformula naming **fewer variables than its parent** makes one event disturb
+unboundedly many keys. Such programs still run, by rereading the log, and
+`Machine.index.usable` says so.
+</Callout>
+
+## Restarting
+
+Nothing but events is written to disk. The index and the ledger are rebuilt by
+living through the past again, so a process that died and came back is
+indistinguishable from one that never died.
+
+That is also the standing cost: **opening a log of ten million events replays
+all ten million.** Steady state is constant per event; startup is not.
+Snapshotting — one that can be *checked* against the log rather than trusted —
+is [where help is wanted](/docs/contributing).
+
+## Running it yourself
+
+```bash
+python bench/scaling.py
+```
+
+The benchmark prints both paths side by side, so the claim is measured rather
+than asserted. There is more on what `bench/` contains in
+<Source file="bench/README.md" />.

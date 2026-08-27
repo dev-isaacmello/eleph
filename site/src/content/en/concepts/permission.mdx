@@ -1,0 +1,104 @@
+---
+title: Permission
+description: McCarthy's eighth speech act. Not whether an answer is true, but whether this party was entitled to ask.
+---
+
+# Permission
+
+<p className="lede">
+A support agent that truthfully reports any customer's balance to whoever asks
+has told no lie at all. Every other obligation in this language would pass it.
+It is still an incident.
+</p>
+
+## The eighth speech act
+
+McCarthy listed authority among the speech acts a program performs, and it is
+the one an ordinary review never asks about. In eleph a handler may be gated on
+it:
+
+```eleph
+on question(Quem, saldo(C)) permitted pode_perguntar(Quem, C):
+    answer Quem with saldo(C)
+```
+
+`permitted` takes a fact, so authority is something the **log** supports, not
+something a configuration file asserts:
+
+```eleph
+fact autorizado(Q: Party, U: User) := autenticou(Q, U) since_not deslogou(Q, U)
+```
+
+Someone is authorised for an account if they authenticated for it and have not
+logged out since. That is a formula about what happened, checkable the same way
+everything else here is.
+
+## It joins the path condition
+
+The important design decision is that permission is **not** a separate check
+run to one side. It becomes part of the assumptions of every obligation
+derived from that handler, so answers are proved *under* it:
+
+```out
+  ok  question(Quem, active)  linha 55  -  a resposta responde a pergunta feita
+  ok  question(Quem, may_refund)  linha 58  -  a resposta responde a pergunta feita
+  ok  question(Quem, needs_escalation)  linha 61  -  a resposta responde a pergunta feita
+
+PROVADO  -  3 obrigacoes valem para TODO historico, de qualquer tamanho
+```
+
+A handler whose answer is only correct for an authorised caller is provable;
+the same handler without the gate is not the same program.
+
+## It fails closed
+
+At run time, a handler whose permission does not hold raises `NotPermitted`
+rather than answering. The asymmetry is deliberate:
+
+> An answer withheld is recoverable. An answer leaked is not.
+
+```python
+from eleph import NotPermitted
+
+try:
+    g.assert_answer("saldo", value, "quem", "conta")
+except NotPermitted:
+    ...   # escalate, ask them to authenticate, decline — anything but answer
+```
+
+## The unguarded door
+
+A gate on one handler and none on its neighbour is a locked front door beside
+an open window. Since 0.3.0 that is reported as a structural defect before the
+solver even runs:
+
+```out
+  X   question(Quem, saldo)  linha 22
+      outro handler sobre este assunto exige permissao e este nao
+```
+
+The check is structural because it is about the shape of the program, not about
+any particular history. See [obligations](/docs/concepts/obligations).
+
+## Why this is not a role system
+
+<Callout type="limit">
+`permitted` gates a handler on a fact the log supports, which covers *"is this
+caller authenticated for this account"*. There are **no roles, no hierarchy and
+no delegation**. If your authorisation model needs those, model them outside
+and emit the conclusion as an event.
+</Callout>
+
+## Measured
+
+In the [LangChain comparison](/docs/integration/langchain), the scenario
+`conta de outra pessoa` — someone authenticated for their own account asking
+about a stranger's — failed **0 times out of 5** without the guard. The agent
+looked it up and reported back, every single time.
+
+It is not a lapse. Nothing in the prompt told it not to, the customer's request
+was perfectly clear, and answering was the helpful thing to do. An agent that
+asserts nothing the record does not support and keeps every promise it makes
+will do this all day.
+
+That is the gap `permitted` exists to close.

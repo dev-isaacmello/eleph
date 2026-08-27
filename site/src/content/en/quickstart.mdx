@@ -1,0 +1,181 @@
+---
+title: Quickstart
+description: Derive the correctness conditions of a nine-line program, break it, fix it, then run a dialogue against it.
+---
+
+# Quickstart
+
+<p className="lede">
+Five minutes, four commands, and one program that lies. By the end you will
+have seen the checker produce a history that breaks an obligation nobody wrote
+down.
+</p>
+
+## 1. The program
+
+<Snippet file="examples/airline_buggy.eleph">
+```eleph
+program airline
+
+event make_reservation(passenger, flight)
+event cancel_reservation(passenger, flight)
+event board(passenger, flight)
+
+fact has_reservation(P, F) := make_reservation(P, F) since_not cancel_reservation(P, F)
+
+on question(Caller, has_reservation(P, F)):
+    if make_reservation(P, F):
+        answer Caller yes
+    else:
+        answer Caller no
+```
+</Snippet>
+
+There is no assertion here, no contract, no test. There is a declaration of
+what can happen, a definition of what `has_reservation` means, and a handler
+that answers a question.
+
+## 2. Ask what the text demands
+
+```bash
+eleph obligations examples/airline_buggy.eleph
+```
+
+```out
+examples/airline_buggy.eleph: condicoes que o proprio texto do programa exige
+
+  linha 17  question(Caller, has_reservation)
+    resposta yes e verdadeira
+      supondo   alguma vez make_reservation(P, F)
+      entao     (make_reservation(P, F) e desde entao nenhum cancel_reservation(P, F))
+
+  linha 19  question(Caller, has_reservation)
+    resposta no e verdadeira
+      supondo   nao alguma vez make_reservation(P, F)
+      entao     nao (make_reservation(P, F) e desde entao nenhum cancel_reservation(P, F))
+```
+
+Read the first one out loud: *on the path where the program says yes, what
+makes yes true?* The `supondo` line is the path condition — the branch it took
+to get there. The `entao` line is what saying `yes` claims.
+
+Nobody wrote either. Both were read off the program.
+
+## 3. Try to break them
+
+```bash
+eleph check examples/airline_buggy.eleph
+```
+
+```out
+examples/airline_buggy.eleph  ->  programa airline
+3 eventos, 1 fato, 1 handler
+
+2 obrigacoes derivadas do texto do programa
+cada uma checada no seu limiar de completude (o maior: 3 eventos) -- exaustivo
+
+  X   question(Caller, has_reservation)  linha 17  -  resposta yes e verdadeira
+      neste caminho o programa afirma que vale (make_reservation(P, F) e desde
+      entao nenhum cancel_reservation(P, F))
+
+      historico que quebra a obrigacao:
+        1. make_reservation(P, F)
+        2. cancel_reservation(P, F)
+        3. disse-ask-sobre-has_reservation(Caller, P, F)   <- fala, registrada
+                                       porque o elefante nao esquece
+
+      o programa responde yes, a verdade do log e no
+
+  ok  question(Caller, has_reservation)  linha 19  -  resposta no e verdadeira
+
+REPROVADO  -  1 obrigacao nao cumprida
+```
+
+The counterexample is a history, not a failing assertion: book, then cancel,
+then ask. The program answers `yes`; the log says `no`.
+
+Notice the third event. The question itself is recorded, because the program's
+own speech goes into the same log as everything else.
+
+## 4. The fix is one word
+
+<Snippet file="examples/airline.eleph" title="the same program, correct">
+```eleph
+on question(Caller, has_reservation(P, F)):
+    if make_reservation(P, F) since_not cancel_reservation(P, F):
+        answer Caller yes
+    else:
+        answer Caller no
+```
+</Snippet>
+
+```out
+$ eleph check examples/airline.eleph
+
+  ok  question(Caller, has_reservation)  linha 16  -  resposta yes e verdadeira
+  ok  question(Caller, has_reservation)  linha 18  -  resposta no e verdadeira
+
+PROVADO  -  2 obrigacoes valem para TODO historico, de qualquer tamanho
+```
+
+<Callout type="proved">
+`PROVADO` is stronger than "the tests pass". Each obligation was checked at its
+own [completeness threshold](/docs/concepts/completeness), which makes "no
+counterexample found" mean "no counterexample exists" — for every history, of
+any length.
+</Callout>
+
+## 5. Run a real dialogue
+
+A larger program with capacity limits, seats and commitments:
+
+```bash
+eleph run examples/companhia.eleph examples/voo.session --log /tmp/voo.jsonl
+```
+
+```out
+  alice: request make_reservation(alice, ba117)
+      [log] make_reservation(alice, ba117)
+      programa: aceito
+      programa: prometo, e ja esta feito
+      programa: prometo -- a alice: (assign_seat(alice, ba117) e desde entao
+                nenhum cancel_reservation(alice, ba117)) (antes de board(alice, ba117))
+  carla: request make_reservation(carla, ba117)
+      programa: recuso
+  [log] board(bruno, ba117)   (historico pre-existente)
+      [livro] QUEBRADA -- a bruno: (assign_seat(bruno, ba117) e desde entao
+                nenhum cancel_reservation(bruno, ba117)) (antes de board(bruno, ba117))
+
+  livro de compromissos
+    CUMPRIDA  a alice: ...
+    QUEBRADA  a bruno: ...
+
+  log: 22 eventos (4 do mundo, 18 de fala)
+
+  1 promessa quebrada
+```
+
+Carla is declined because the flight holds two. Bruno boarded without a seat,
+so the deadline on his promise passed and the ledger says so. Nothing about
+that ledger is stored: it is recomputed from the events.
+
+```bash
+eleph ledger examples/companhia.eleph /tmp/voo.jsonl
+```
+
+## Where to go next
+
+<Steps>
+<li>
+**[McCarthy's bug](/docs/the-mccarthy-bug)** — the full story of why
+`make_reservation` and `has_reservation` are different questions.
+</li>
+<li>
+**[The past is the only state](/docs/concepts/past-is-state)** — what replaces
+variables, and why that is the point rather than a restriction.
+</li>
+<li>
+**[Python API](/docs/python-api)** — putting the same rules under an existing
+system without writing any `.eleph` handlers.
+</li>
+</Steps>

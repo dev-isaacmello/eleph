@@ -1,0 +1,234 @@
+---
+title: CLI
+description: The five commands — obligations, check, run, talk, ledger — with every flag and every exit code.
+---
+
+# CLI
+
+<p className="lede">
+Five commands. Two of them read the program, two of them run it, and one reads
+back what it still owes.
+</p>
+
+```out
+$ eleph --help
+usage: elephant [-h] {check,obligations,run,talk,ledger} ...
+
+positional arguments:
+  {check,obligations,run,talk,ledger}
+    check               verificar um programa
+    obligations         mostrar as condicoes derivadas, sem verificar
+    run                 executar um dialogo contra o programa
+    talk                conversar em linguagem natural
+    ledger              o que o programa ainda deve
+```
+
+Every command accepts `--no-color`, which is what you want in CI and in a pipe.
+
+## `eleph obligations`
+
+```bash
+eleph obligations <file>
+```
+
+Print the correctness conditions the program's own text demands, without trying
+to discharge them. The point of the exercise: **nobody wrote these.**
+
+```out
+$ eleph obligations examples/airline_buggy.eleph
+
+examples/airline_buggy.eleph: condicoes que o proprio texto do programa exige
+
+  linha 17  question(Caller, has_reservation)
+    resposta yes e verdadeira
+      supondo   alguma vez make_reservation(P, F)
+      entao     (make_reservation(P, F) e desde entao nenhum cancel_reservation(P, F))
+
+  linha 19  question(Caller, has_reservation)
+    resposta no e verdadeira
+      supondo   nao alguma vez make_reservation(P, F)
+      entao     nao (make_reservation(P, F) e desde entao nenhum cancel_reservation(P, F))
+```
+
+Structural defects are listed after the obligations, prefixed by their line.
+
+## `eleph check`
+
+```bash
+eleph check <file> [--bound N] [--objects N]
+```
+
+Derive the obligations and try to break each one at its own [completeness
+threshold](/docs/concepts/completeness).
+
+```out
+$ eleph check examples/companhia.eleph
+
+examples/companhia.eleph  ->  programa companhia
+5 eventos, 4 fatos, 6 handlers
+
+6 obrigacoes derivadas do texto do programa
+cada uma checada no seu limiar de completude (o maior: 10 eventos) -- exaustivo
+
+  ok  question(C, has_reservation)  linha 30  -  a resposta responde a pergunta feita
+  ok  question(C, has_seat)  linha 33  -  a resposta responde a pergunta feita
+  ok  question(C, seats_left)  linha 36  -  a resposta responde a pergunta feita
+  ok  request(C, make_reservation)  linha 45  -  a promessa esta cumprida ao ser feita
+  ok  request(C, make_reservation)  linha 46  -  a promessa pode vir a ser cumprida (antes de board(P, F))
+      cumprivel por: request assign_seat > entao l51
+  ok  request(C, cancel_reservation)  linha 61  -  a promessa esta cumprida ao ser feita
+
+PROVADO  -  6 obrigacoes valem para TODO historico, de qualquer tamanho
+```
+
+### Flags
+
+| Flag | Default | Effect |
+|---|---|---|
+| `--bound N` | the completeness threshold | force the history length. Below the threshold the result stops being a proof, and the tool says so |
+| `--objects N` | the computed domain | force the number of objects per sort |
+| `--no-color` | off | plain output |
+
+<Callout type="danger" title="A bound below the threshold is not a proof">
+```out
+$ eleph check examples/fundo.eleph --bound 6
+
+  linha 11: limite pedido abaixo do limiar
+
+  ok? question(C, elite)  linha 11  -  resposta yes e verdadeira
+
+SEM CONTRAEXEMPLO  -  dentro dos limites checados, que nao sao exaustivos aqui
+```
+`ok?` and `SEM CONTRAEXEMPLO` both mean the run was not exhaustive. This
+example lies only after seven events.
+</Callout>
+
+### Exit codes
+
+| Code | Meaning |
+|---|---|
+| `0` | no failures — either `PROVADO` or `SEM CONTRAEXEMPLO` |
+| `1` | `REPROVADO`: at least one obligation has a counterexample or a structural defect |
+| `2` | the file did not lex, parse or resolve |
+
+Note that `0` covers both proved and non-exhaustive. If your CI needs proof
+rather than absence of a counterexample, grep for `PROVADO`.
+
+## `eleph run`
+
+```bash
+eleph run <file> <script> [--log PATH]
+```
+
+Play a scripted session against the program. Script lines are:
+
+<Snippet file="examples/voo.session">
+```text
+# Capacidade 2. Tres passageiros querem entrar.
+request alice make_reservation(alice, ba117)
+request bruno make_reservation(bruno, ba117)
+request carla make_reservation(carla, ba117)
+
+# Alice recebe assento; a promessa dela e paga.
+request alice assign_seat(alice, ba117)
+
+# Bruno embarca sem assento. O prazo vence.
+given board(bruno, ba117)
+
+question alice has_seat(alice, ba117)
+question carla has_reservation(carla, ba117)
+```
+</Snippet>
+
+| Directive | Meaning |
+|---|---|
+| `request <party> <event>(...)` | someone asks the program to do something |
+| `question <party> <fact>(...)` | someone asks the program whether something holds |
+| `given <event>(...)` | the world did something, outside the conversation |
+
+`--log PATH` makes the history durable. Reopening the same path replays it, so
+a run continues where the last one stopped.
+
+Exit code `1` if any promise ended up breached; a refusal prints `RECUSA` and
+also exits `1`.
+
+## `eleph talk`
+
+```bash
+eleph talk <file> <conversation> [--roster a,b,c] [--claude] [--log PATH]
+```
+
+Plain language in, speech acts out, the same guarantees underneath.
+
+```out
+$ eleph talk examples/companhia.eleph examples/conversa.txt --roster alice,bruno,ba117
+
+  extrator: PatternExtractor (proposicoes, nao decisoes)
+
+  alice: "quero make_reservation para alice no ba117"
+      -> lido como: request make_reservation(alice, ba117)
+  alice: request make_reservation(alice, ba117)
+      [log] make_reservation(alice, ba117)
+      programa: aceito
+      programa: prometo, e ja esta feito
+  alice: "a alice tem has_reservation no ba117?"
+      -> lido como: question has_reservation(alice, ba117)
+      programa: yes
+  alice: e a cotacao do dolar hoje?
+      (nada que este programa saiba tratar)
+```
+
+| Flag | Effect |
+|---|---|
+| `--roster a,b,c` | known names, so the extractor can resolve them |
+| `--claude` | use Claude as the extractor instead of the pattern matcher. Requires `pip install "eleph[claude]"` and a credential |
+| `--log PATH` | durable history, as with `run` |
+
+<Callout type="note" title="The extractor proposes; the language decides">
+The front end turns text into candidate speech acts and nothing more. The JSON
+schema the model answers into is generated from the program's own handlers, so
+it cannot propose an act the program does not have. If a proposal would break
+an obligation, the runtime refuses it — and the run prints
+`o extrator propos; a linguagem recusou.`
+</Callout>
+
+## `eleph ledger`
+
+```bash
+eleph ledger <file> <log>
+```
+
+What the program still owes, read back off its history.
+
+```out
+$ eleph ledger examples/companhia.eleph /tmp/voo.jsonl
+
+/tmp/voo.jsonl
+  22 eventos (4 do mundo, 18 de fala)
+
+  CUMPRIDA  a alice: (assign_seat(alice, ba117) e desde entao nenhum
+            cancel_reservation(alice, ba117)) (antes de board(alice, ba117))
+  QUEBRADA  a bruno: (assign_seat(bruno, ba117) e desde entao nenhum
+            cancel_reservation(bruno, ba117)) (antes de board(bruno, ba117))
+
+  1 promessa quebrada
+```
+
+Exit code `1` if anything is breached. Nothing about that ledger is stored: it
+is recomputed from the events.
+
+## Reading the output
+
+| Marker | Colour | Meaning |
+|---|---|---|
+| `ok` | green | discharged at the completeness threshold |
+| `ok?` | yellow | survived the bound given, which was below the threshold |
+| `X` | red | counterexample, printed as a history |
+| `CUMPRIDA` | green | commitment kept |
+| `ABERTA` | yellow | commitment outstanding |
+| `QUEBRADA` | red | commitment breached |
+| `LIBERADA` | dim | commitment released |
+| `RECUSA` | red | the runtime refused a speech act |
+
+The command name in `--help` is `elephant`, which is the parser's `prog`; the
+installed entry point is `eleph`.
