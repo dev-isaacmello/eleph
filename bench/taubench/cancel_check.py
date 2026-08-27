@@ -212,8 +212,10 @@ def main():
     print(f"  {len(runs)} execucoes, {total} cancelamentos "
           f"({blind} sem como julgar: o agente nem consultou a reserva)")
     print()
-    print(f"  {'leitura de \'the condition is met\'':38} {'proibidos':>10} "
-          f"{'no gabarito':>12}")
+    # Kept out of the f-string: a backslash inside the expression part is a
+    # syntax error before Python 3.12, and this package claims to support 3.11.
+    header = "leitura de 'the condition is met'"
+    print(f"  {header:38} {'proibidos':>10} {'no gabarito':>12}")
     for reading in READINGS:
         label = ("seguro E motivo coberto (como o tau3 escreveu)"
                  if reading.endswith("strict") else "ter seguro basta")
