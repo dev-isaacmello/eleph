@@ -1,0 +1,31 @@
+# Biblioteca: emprestimo, devolucao e pergunta.
+#
+# Nao existe campo "emprestado". O livro esta emprestado quando saiu e nao
+# voltou desde entao. Emprestimo so para livro que esta na estante, devolucao
+# so para livro que saiu, e a resposta a quem pergunta vem do mesmo fato.
+
+program biblioteca
+
+event checkout(book)
+event checkin(book)
+
+fact on_loan(B) := checkout(B) since_not checkin(B)
+
+on question(Caller, on_loan(B)):
+    answer Caller with on_loan(B)
+
+on request(Caller, checkout(B)):
+    if on_loan(B):
+        decline Caller
+    else:
+        record checkout(B)
+        accept Caller
+        promise Caller that on_loan(B)
+
+on request(Caller, checkin(B)):
+    if on_loan(B):
+        record checkin(B)
+        accept Caller
+        promise Caller that not on_loan(B)
+    else:
+        decline Caller
