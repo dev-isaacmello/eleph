@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "eleph-local": {
+      "type": "stdio",
+      "command": ".venv/bin/eleph-mcp",
+      "args": []
+    }
+  }
+}

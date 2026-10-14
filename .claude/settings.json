@@ -1,0 +1,66 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-settings.json",
+  "permissions": {
+    "allow": [
+      "Bash(uv run pytest:*)",
+      "Bash(uv run eleph check:*)",
+      "Bash(uv run eleph obligations:*)",
+      "Bash(uv run python examples/agente.py:*)",
+      "Bash(uv run python site/scripts/check-eleph-blocks.py:*)",
+      "Bash(uv build:*)",
+      "Bash(uv pip install -e:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)",
+      "Bash(git show:*)",
+      "Bash(npm run typecheck:*)",
+      "Bash(npm run build:*)",
+      "mcp__eleph-local__eleph_check",
+      "mcp__eleph-local__eleph_obligations",
+      "mcp__eleph-local__eleph_simulate",
+      "mcp__eleph-local__eleph_declarations"
+    ],
+    "ask": [
+      "Bash(git commit:*)",
+      "Bash(gh pr create:*)"
+    ],
+    "deny": [
+      "Read(./.env)",
+      "Read(./.env.*)",
+      "Read(**/.env)",
+      "Read(**/.env.*)",
+      "Read(~/.pypirc)",
+      "Read(**/*.pem)",
+      "Read(**/*.key)",
+      "Read(~/.ssh/**)",
+      "Read(~/.config/gh/**)",
+      "Bash(cat .env*)",
+      "Bash(printenv:*)",
+      "Bash(env)",
+      "Bash(uv publish:*)",
+      "Bash(twine upload:*)",
+      "Bash(git push:*)",
+      "Bash(git tag:*)",
+      "Bash(gh release:*)",
+      "Bash(git reset --hard:*)",
+      "Edit(site/node_modules/**)",
+      "Edit(dist/**)"
+    ]
+  },
+  "enableAllProjectMcpServers": false,
+  "enabledMcpjsonServers": ["eleph-local"],
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"$CLAUDE_PROJECT_DIR\"/.claude/hooks/verificar-edicao.sh",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}
