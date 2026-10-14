@@ -339,7 +339,8 @@ def test_the_examples_still_take_the_fast_path():
 
     root = pathlib.Path(__file__).parent.parent
     for name in ("examples/companhia.eleph", "examples/airline.eleph",
-                 "examples/booking.eleph", "examples/fundo.eleph",
+                 "examples/booking.eleph", "examples/biblioteca.eleph",
+                 "examples/fundo.eleph",
                  "examples/langchain-agent/policy.eleph"):
         guard = Policy.from_file(root / name).guard()
         assert guard.machine.index.usable is True, name

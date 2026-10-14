@@ -37,10 +37,10 @@ jobs:
       - name: every example verifies as expected
         run: |
           set -e
-          for f in examples/airline.eleph examples/booking.eleph examples/companhia.eleph examples/langchain-agent/policy.eleph; do
+          for f in examples/airline.eleph examples/booking.eleph examples/companhia.eleph examples/biblioteca.eleph examples/langchain-agent/policy.eleph; do
             uv run eleph check "$f" --no-color | tail -2 | grep -q PROVADO
           done
-          for f in examples/airline_buggy.eleph examples/booking_buggy.eleph examples/fundo.eleph; do
+          for f in examples/airline_buggy.eleph examples/booking_buggy.eleph examples/biblioteca_buggy.eleph examples/fundo.eleph; do
             uv run eleph check "$f" --no-color | tail -2 | grep -q REPROVADO
           done
 
